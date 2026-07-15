@@ -3,7 +3,10 @@
 set -Eeuo pipefail
 
 readonly container_name="${WOLFRAM_CONTAINER_NAME:-juliaform-wolfram-runtime}"
-readonly docker_config="${JULIAFORM_DOCKER_CONFIG:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/juliaform-docker-auth}"
+readonly runner_temporary_directory="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+readonly docker_config="${JULIAFORM_DOCKER_CONFIG:-${runner_temporary_directory}/juliaform-docker-auth}"
+readonly runtime_state_directory="${JULIAFORM_RUNTIME_STATE:-${runner_temporary_directory}/juliaform-wolfram-runtime}"
+readonly image_id_path="${runtime_state_directory}/image-id"
 
 script_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd -- "${script_directory}/../.." && pwd)"
@@ -21,7 +24,8 @@ require_no_arguments() {
   (( $# == 0 )) || fail "unexpected arguments: $*"
 }
 
-start_runtime() {
+prepare_runtime() {
+  local runtime_image_id=""
   local runtime_image="${WOLFRAM_RUNTIME_IMAGE:-}"
 
   require_no_arguments "$@"
@@ -32,60 +36,66 @@ start_runtime() {
   [[ -n "${DOCKERHUB_TOKEN:-}" ]] ||
     fail "DOCKERHUB_TOKEN is empty"
 
-  if docker container inspect "${container_name}" >/dev/null 2>&1; then
-    fail "container already exists: ${container_name}"
-  fi
-
-  mkdir -p -- "${docker_config}"
-  chmod 700 "${docker_config}"
+  mkdir -p -- "${docker_config}" "${runtime_state_directory}"
+  chmod 700 "${docker_config}" "${runtime_state_directory}"
   export DOCKER_CONFIG="${docker_config}"
 
   printf '%s' "${DOCKERHUB_TOKEN}" |
     docker login --username "${DOCKERHUB_USERNAME}" --password-stdin >/dev/null
   docker pull --quiet "${runtime_image}" >/dev/null
-  docker run --detach \
-    --name "${container_name}" \
-    --user root \
-    --workdir /workspace \
-    --volume "${repository_root}:/workspace" \
-    --entrypoint tail \
-    "${runtime_image}" -f /dev/null >/dev/null
+  runtime_image_id="$(docker image inspect --format '{{.Id}}' "${runtime_image}")"
+  [[ "${runtime_image_id}" =~ ^sha256:[0-9a-f]{64}$ ]] ||
+    fail "pulled image has an invalid local image ID"
+  printf '%s\n' "${runtime_image_id}" > "${image_id_path}"
+  chmod 600 "${image_id_path}"
 
-  docker exec "${container_name}" wolframscript -code \
+  run_in_runtime wolframscript -code \
     'If[StringStartsQ[$Version, "15.0.0 "], Print[$Version], Print["Expected Wolfram 15.0.0, got ", $Version]; Exit[1]]'
 }
 
 run_in_runtime() {
-  (( $# > 0 )) || fail "exec requires a command"
-  docker container inspect "${container_name}" >/dev/null 2>&1 ||
-    fail "container is not running: ${container_name}"
-  docker exec "${container_name}" "$@"
+  local runtime_image_id=""
+
+  (( $# > 0 )) || fail "run requires a command"
+  [[ -f "${image_id_path}" ]] ||
+    fail "runtime is not prepared: missing local image ID"
+  IFS= read -r runtime_image_id < "${image_id_path}"
+  [[ "${runtime_image_id}" =~ ^sha256:[0-9a-f]{64}$ ]] ||
+    fail "runtime state contains an invalid local image ID"
+
+  docker run --rm \
+    --name "${container_name}" \
+    --user root \
+    --workdir /workspace \
+    --volume "${repository_root}:/workspace" \
+    "${runtime_image_id}" "$@"
 }
 
-stop_runtime() {
+cleanup_runtime() {
   require_no_arguments "$@"
   export DOCKER_CONFIG="${docker_config}"
 
   docker container rm --force "${container_name}" >/dev/null 2>&1 || true
   docker logout >/dev/null 2>&1 || true
+  rm -f -- "${image_id_path}"
 }
 
 require_command docker
 
 case "${1:-}" in
-  start)
+  prepare)
     shift
-    start_runtime "$@"
+    prepare_runtime "$@"
     ;;
-  exec)
+  run)
     shift
     run_in_runtime "$@"
     ;;
-  stop)
+  cleanup)
     shift
-    stop_runtime "$@"
+    cleanup_runtime "$@"
     ;;
   *)
-    fail "usage: ${0##*/} {start|exec|stop}"
+    fail "usage: ${0##*/} {prepare|run|cleanup}"
     ;;
 esac

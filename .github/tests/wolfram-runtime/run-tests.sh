@@ -83,23 +83,35 @@ case "${1:-}" in
     shift
     log_command "pull" "$@"
     ;;
+  image)
+    operation="${2:-}"
+    shift 2
+    case "${operation}" in
+      inspect)
+        log_command "image inspect" "$@"
+        printf '%s\n' "${MOCK_IMAGE_ID}"
+        ;;
+      *)
+        echo "unexpected docker image operation: ${operation}" >&2
+        exit 1
+        ;;
+    esac
+    ;;
   run)
     shift
     log_command "run" "$@"
     touch "${MOCK_DOCKER_STATE}"
-    printf 'mock-container-id\n'
-    ;;
-  exec)
-    shift
-    log_command "exec" "$@"
     if [[ "${MOCK_FAIL_VERSION_CHECK:-false}" == "true" ]] &&
        [[ " $* " == *" -code "* ]]; then
+      rm -f -- "${MOCK_DOCKER_STATE}"
       printf 'Expected Wolfram 15.0.0, got 14.0.0\n' >&2
       exit 1
     fi
+    printf 'entrypoint initialized\n'
     if [[ " $* " == *" -code "* ]]; then
       printf '15.0.0 for Linux x86 (64-bit)\n'
     fi
+    rm -f -- "${MOCK_DOCKER_STATE}"
     ;;
   logout)
     shift
@@ -117,45 +129,60 @@ export PATH="${mock_bin}:${PATH}"
 export MOCK_DOCKER_LOG="${mock_log}"
 export MOCK_DOCKER_STATE="${mock_state}"
 export MOCK_EXPECTED_TOKEN="test-token"
+export MOCK_IMAGE_ID="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 export RUNNER_TEMP="${temporary_directory}/runner-temp"
 export DOCKERHUB_USERNAME="test-user"
 export DOCKERHUB_TOKEN="test-token"
 export WOLFRAM_RUNTIME_IMAGE="private/example@sha256:0123456789abcdef"
 
-start_output="${temporary_directory}/start.out"
-bash "${runtime_helper}" start > "${start_output}"
-[[ -f "${mock_state}" ]] || fail "start did not create the mock container"
-assert_contains "15.0.0 for Linux x86 (64-bit)" "${start_output}"
+prepare_output="${temporary_directory}/prepare.out"
+image_id_path="${RUNNER_TEMP}/juliaform-wolfram-runtime/image-id"
+bash "${runtime_helper}" prepare > "${prepare_output}"
+[[ ! -e "${mock_state}" ]] || fail "prepare left its one-shot container running"
+[[ "$(cat "${image_id_path}")" == "${MOCK_IMAGE_ID}" ]] ||
+  fail "prepare did not persist the local image ID"
+assert_contains "entrypoint initialized" "${prepare_output}"
+assert_contains "15.0.0 for Linux x86 (64-bit)" "${prepare_output}"
 assert_contains "login <--username> <test-user> <--password-stdin>" "${mock_log}"
 assert_contains "pull <--quiet> <private/example@sha256:0123456789abcdef>" "${mock_log}"
-assert_contains "run <--detach> <--name> <juliaform-wolfram-runtime>" "${mock_log}"
+assert_contains "image inspect <--format> <{{.Id}}> <private/example@sha256:0123456789abcdef>" "${mock_log}"
+assert_contains "run <--rm> <--name> <juliaform-wolfram-runtime>" "${mock_log}"
 assert_contains "<--user> <root> <--workdir> </workspace>" "${mock_log}"
-assert_contains "<--entrypoint> <tail> <private/example@sha256:0123456789abcdef> <-f> </dev/null>" "${mock_log}"
-assert_contains "exec <juliaform-wolfram-runtime> <wolframscript> <-code>" "${mock_log}"
+assert_contains "<${MOCK_IMAGE_ID}> <wolframscript> <-code>" "${mock_log}"
+assert_not_contains "<--entrypoint>" "${mock_log}"
+assert_not_contains "exec <" "${mock_log}"
 assert_not_contains "test-token" "${mock_log}"
-assert_not_contains "test-token" "${start_output}"
+assert_not_contains "test-token" "${prepare_output}"
+assert_not_contains "private/example" "${image_id_path}"
 
-bash "${runtime_helper}" exec wolframscript -file Tests/RunTests.wls
-assert_contains "exec <juliaform-wolfram-runtime> <wolframscript> <-file> <Tests/RunTests.wls>" "${mock_log}"
+unset DOCKERHUB_USERNAME DOCKERHUB_TOKEN WOLFRAM_RUNTIME_IMAGE
+bash "${runtime_helper}" run wolframscript -file Tests/RunTests.wls
+assert_contains "<${MOCK_IMAGE_ID}> <wolframscript> <-file> <Tests/RunTests.wls>" "${mock_log}"
+[[ ! -e "${mock_state}" ]] || fail "run left its one-shot container running"
 
-bash "${runtime_helper}" stop
-[[ ! -e "${mock_state}" ]] || fail "stop did not remove the mock container"
+bash "${runtime_helper}" cleanup
+[[ ! -e "${mock_state}" ]] || fail "cleanup did not remove the mock container"
+[[ ! -e "${image_id_path}" ]] || fail "cleanup did not remove runtime state"
 assert_contains "container rm <--force> <juliaform-wolfram-runtime>" "${mock_log}"
 assert_contains "logout" "${mock_log}"
 
+export DOCKERHUB_USERNAME="test-user"
+export DOCKERHUB_TOKEN="test-token"
 missing_secret_error="${temporary_directory}/missing-secret.err"
 if env -u WOLFRAM_RUNTIME_IMAGE \
-  bash "${runtime_helper}" start 2> "${missing_secret_error}"; then
-  fail "start unexpectedly accepted a missing image secret"
+  bash "${runtime_helper}" prepare 2> "${missing_secret_error}"; then
+  fail "prepare unexpectedly accepted a missing image secret"
 fi
 assert_contains "WOLFRAM_RUNTIME_IMAGE is empty" "${missing_secret_error}"
 
 export MOCK_FAIL_VERSION_CHECK="true"
+export WOLFRAM_RUNTIME_IMAGE="private/example@sha256:0123456789abcdef"
 version_error="${temporary_directory}/version.err"
-if bash "${runtime_helper}" start >/dev/null 2> "${version_error}"; then
-  fail "start unexpectedly accepted the wrong Wolfram version"
+if bash "${runtime_helper}" prepare >/dev/null 2> "${version_error}"; then
+  fail "prepare unexpectedly accepted the wrong Wolfram version"
 fi
 assert_contains "Expected Wolfram 15.0.0, got 14.0.0" "${version_error}"
-bash "${runtime_helper}" stop
+[[ ! -e "${mock_state}" ]] || fail "failed version check left its container running"
+bash "${runtime_helper}" cleanup
 
 echo "wolfram-runtime mock tests passed"

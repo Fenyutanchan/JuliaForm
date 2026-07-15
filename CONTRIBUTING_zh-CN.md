@@ -164,9 +164,10 @@ GitHub Actions 工作流会在向 `main` push、同仓库 pull request、merge q
 group、严格版本 tag 和手动运行时，使用 Wolfram Engine 15.0.0，在
 Julia 的 `lts` 与 `latest` 通道上重复这两条路径。`latest` 通道使用
 setup-julia 的 `'1'` 选择器，即最新稳定的 Julia 1.x。Wolfram 命令在
-`.github/scripts/wolfram-runtime.sh` 管理的私有、完整授权运行时中执行。fork pull
-request 无法获得镜像与 Docker Hub secrets，因此其 `CI summary` 会明确失败，
-直到维护者从同仓库分支复测该 commit。
+`.github/scripts/wolfram-runtime.sh` 管理的私有、完整授权运行时中执行。该运行时
+支持无限实例并发，因此两个 Julia 矩阵项可以在各自独立的 runner 上同时运行。
+fork pull request 无法获得镜像与 Docker Hub secrets，因此其 `CI summary` 会
+明确失败，直到维护者从同仓库分支复测该 commit。
 
 不读取 secret 的 `Repository config` 作业也是必需前置门禁。它按版本和归档
 SHA-256 固定 actionlint，检查每个工作流 shell 脚本，精确验证受版本控制的

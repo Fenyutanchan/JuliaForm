@@ -204,10 +204,12 @@ required_workflow_fragments = [
   "DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}",
   "DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}",
   "WOLFRAM_RUNTIME_IMAGE: ${{ secrets.WOLFRAM_RUNTIME_IMAGE }}",
-  "bash .github/scripts/wolfram-runtime.sh start",
-  "bash .github/scripts/wolfram-runtime.sh exec",
-  "bash .github/scripts/wolfram-runtime.sh stop",
-  "julia --startup-file=no --check-bounds=yes Tests/JuliaValidation.jl"
+  "bash .github/scripts/wolfram-runtime.sh prepare",
+  "bash .github/scripts/wolfram-runtime.sh run",
+  "bash .github/scripts/wolfram-runtime.sh cleanup",
+  "wolframscript -file Tests/JuliaValidation.wls > dist/JuliaValidation.out",
+  "julia --startup-file=no --check-bounds=yes \\",
+  "Tests/JuliaValidation.jl dist/JuliaValidation.out"
 ]
 required_workflow_fragments.each do |fragment|
   assert(workflow.include?(fragment), "CI workflow is missing a required policy fragment: #{fragment}")
@@ -225,6 +227,8 @@ test_block = workflow[/^  test:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\z)/m, 1]
 assert(test_block, "CI workflow is missing the test job body")
 assert(!test_block.match?(/^    container:/),
        "test job must not use jobs.<job_id>.container because its image cannot read secrets")
+assert(!test_block.include?("max-parallel:"),
+       "test matrix must not serialize unlimited Wolfram runtime instances")
 assert(test_block.include?("if: ${{ always() }}"),
        "test job must clean up the private Wolfram runtime unconditionally")
 
@@ -239,5 +243,13 @@ assert(File.file?(File.join(ROOT, ".github/scripts/wolfram-runtime.sh")),
        "private Wolfram runtime helper is missing")
 assert(File.file?(File.join(ROOT, ".github/tests/wolfram-runtime/run-tests.sh")),
        "private Wolfram runtime mock tests are missing")
+
+runtime_helper = File.read(File.join(ROOT, ".github/scripts/wolfram-runtime.sh"))
+assert(runtime_helper.include?("docker run --rm"),
+       "private Wolfram runtime commands must use one-shot containers")
+assert(!runtime_helper.include?("--entrypoint"),
+       "private Wolfram runtime helper must preserve the image entrypoint")
+assert(!runtime_helper.include?("docker exec"),
+       "private Wolfram runtime helper must not bypass entrypoint environment setup")
 
 puts "Repository settings, rulesets, Dependabot, and workflow policy are valid."

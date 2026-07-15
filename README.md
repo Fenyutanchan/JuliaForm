@@ -451,23 +451,25 @@ the repository's private, fully licensed Wolfram 15.0.0 runtime and a two-entry
 Julia matrix covering `lts` and `latest`. Ordinary feature-branch pushes are
 not a second trigger, so an open pull request is not billed twice. The `latest`
 channel maps to setup-julia's `'1'` selector for the latest stable Julia 1.x
-release. After both matrix legs pass, the latest leg builds and independently
-validates the `.paclet`, then uploads it as `JuliaForm-paclet` with seven-day
-retention. A secret-free `Repository config` job also pins and runs actionlint,
-validates every checked-in policy, and exercises the publisher with a local
-`gh` mock. The single `CI summary` job requires both configuration and test
-gates. Only pull-request runs cancel obsolete work; main and tag runs cannot be
-interrupted while approaching publication.
+release. The private runtime supports unlimited concurrent instances, so the
+two matrix legs are not serialized and may occupy independent runners at the
+same time. After both pass, the latest leg builds and independently validates
+the `.paclet`, then uploads it as `JuliaForm-paclet` with seven-day retention.
+A secret-free `Repository config` job also pins and runs actionlint, validates
+every checked-in policy, and exercises the publisher with a local `gh` mock.
+The single `CI summary` job requires both configuration and test gates. Only
+pull-request runs cancel obsolete work; main and tag runs cannot be interrupted
+while approaching publication.
 
 All GitHub Actions use full commit SHA pins with human-readable version
 comments. Set `WOLFRAM_RUNTIME_IMAGE` to an immutable digest reference whenever
-possible; CI also requires the started runtime to report exactly Wolfram
-15.0.0 before tests begin. Repository Actions settings should require SHA
-pinning and allow only GitHub-owned actions plus `julia-actions/setup-julia`;
-`.github/dependabot.yml` maintains these pins weekly. The API payloads under
-`.github/repository-settings/` make these settings and the environment policies
-reproducible. Test jobs have only `contents: read`, while preflight and summary
-jobs receive no token permissions.
+possible; CI also requires the first entrypoint-initialized container to report
+exactly Wolfram 15.0.0 before tests begin. Repository Actions settings should
+require SHA pinning and allow only GitHub-owned actions plus
+`julia-actions/setup-julia`; `.github/dependabot.yml` maintains these pins
+weekly. The API payloads under `.github/repository-settings/` make these
+settings and the environment policies reproducible. Test jobs have only
+`contents: read`, while preflight and summary jobs receive no token permissions.
 
 A push to `main` also starts an independent `publish-dev` job. This job sparsely
 checks out only the release helper, downloads the artifact that just passed
@@ -519,15 +521,21 @@ Before the first run, configure these repository Actions secrets:
 | `DOCKERHUB_USERNAME` | Docker Hub account allowed to pull that image |
 | `DOCKERHUB_TOKEN` | Read-only Docker Hub access token for that account |
 
-The image must provide a noninteractive, fully licensed Linux amd64
-`wolframscript`, must support execution as root, and must contain `tail`. The
-workflow deliberately does not use `jobs.<job_id>.container`: GitHub permits
-secrets in container credentials but not in
+The image must provide a noninteractive Linux amd64 `wolframscript`, support
+execution as root, and use an entrypoint that installs its license or prepares
+its environment before forwarding the supplied command. The workflow
+deliberately does not use `jobs.<job_id>.container`: GitHub permits secrets in
+container credentials but not in
 [`container.image`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability).
 Instead, `.github/scripts/wolfram-runtime.sh` uses an isolated Docker
-authentication directory on the runner, pulls the secret image, mounts the
-checkout at `/workspace`, and keeps one container alive for the complete test
-leg. The always-run cleanup removes the container and logs out. The obsolete
+authentication directory on the runner, pulls the secret image, and records
+only its local image ID. Each Wolfram command then runs in a one-shot
+`docker run --rm` container with the image's native entrypoint and the checkout
+mounted at `/workspace`. This ensures that entrypoint-installed mathpass data
+and exported environment variables reach the Wolfram process. Julia validation
+reads Wolfram output from an internally redirected file so entrypoint log output
+cannot corrupt the generated source stream. The always-run cleanup removes any
+interrupted container, deletes local state, and logs out. The obsolete
 `WOLFRAMSCRIPT_ENTITLEMENTID` secret is not read.
 
 GitHub does not expose repository secrets to pull requests from forks. Such a

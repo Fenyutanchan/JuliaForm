@@ -90,7 +90,6 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         include:
           - julia-channel: lts
@@ -105,13 +104,13 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Start private Wolfram runtime
+      - name: Prepare private Wolfram runtime
         shell: bash
         env:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           WOLFRAM_RUNTIME_IMAGE: ${{ secrets.WOLFRAM_RUNTIME_IMAGE }}
-        run: bash .github/scripts/wolfram-runtime.sh start
+        run: bash .github/scripts/wolfram-runtime.sh prepare
 
       - name: Set up Julia
         uses: julia-actions/setup-julia@fa02766e078afaaf09b14210362cee14137e6a32 # v3.0.2
@@ -122,29 +121,31 @@ jobs:
       - name: Run Wolfram tests
         shell: bash
         run: >-
-          bash .github/scripts/wolfram-runtime.sh exec
+          bash .github/scripts/wolfram-runtime.sh run
           wolframscript -file Tests/RunTests.wls
 
       - name: Validate generated Julia
         shell: bash
         run: |
-          set -o pipefail
-          bash .github/scripts/wolfram-runtime.sh exec \
-            wolframscript -file Tests/JuliaValidation.wls |
-            julia --startup-file=no --check-bounds=yes Tests/JuliaValidation.jl
+          set -euo pipefail
+          bash .github/scripts/wolfram-runtime.sh run \
+            /bin/sh -c \
+            'mkdir -p dist && wolframscript -file Tests/JuliaValidation.wls > dist/JuliaValidation.out'
+          julia --startup-file=no --check-bounds=yes \
+            Tests/JuliaValidation.jl dist/JuliaValidation.out
 
       - name: Build paclet
         if: matrix.julia-channel == 'latest'
         shell: bash
         run: >-
-          bash .github/scripts/wolfram-runtime.sh exec
+          bash .github/scripts/wolfram-runtime.sh run
           wolframscript -file Scripts/BuildPaclet.wls
 
       - name: Validate built paclet
         if: matrix.julia-channel == 'latest'
         shell: bash
         run: >-
-          bash .github/scripts/wolfram-runtime.sh exec
+          bash .github/scripts/wolfram-runtime.sh run
           wolframscript -file Tests/ValidatePacletArtifact.wls
 
       - name: Upload paclet artifact
@@ -157,10 +158,10 @@ jobs:
           compression-level: 0
           retention-days: 7
 
-      - name: Stop private Wolfram runtime
+      - name: Clean up private Wolfram runtime
         if: ${{ always() }}
         shell: bash
-        run: bash .github/scripts/wolfram-runtime.sh stop
+        run: bash .github/scripts/wolfram-runtime.sh cleanup
 
   ci-summary:
     name: CI summary

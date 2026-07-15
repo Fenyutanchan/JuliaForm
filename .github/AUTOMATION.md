@@ -12,12 +12,17 @@ runs the release publisher against the local `gh` mock.
 
 The test matrix uses `.github/scripts/wolfram-runtime.sh` to authenticate to
 Docker Hub with an isolated client configuration, pull the private runtime
-named by `WOLFRAM_RUNTIME_IMAGE`, and execute every Wolfram command in one
-root-owned container with the checkout mounted at `/workspace`. Startup fails
-unless the runtime reports Wolfram 15.0.0. The workflow always removes the
-container and logs out; it never reads the legacy on-demand entitlement secret.
-The repository-config gate exercises this lifecycle against a local Docker
-mock without exposing or requiring real credentials.
+named by `WOLFRAM_RUNTIME_IMAGE`, and retain only its local image ID. Every
+Wolfram command then runs in a fresh root-owned `docker run --rm` container
+with the checkout mounted at `/workspace`. The image's native entrypoint is
+preserved for license installation and environment initialization, and the
+first one-shot container must report Wolfram 15.0.0. The runtime permits
+unlimited concurrent instances, so the Julia matrix has no `max-parallel`
+throttle and its independent runner jobs may execute together. The workflow
+always removes any interrupted container, deletes its local state, and logs
+out; it never reads the legacy on-demand entitlement secret. The
+repository-config gate exercises this lifecycle against a local Docker mock
+without exposing or requiring real credentials.
 
 Stable releases preserve the paclet name produced by `Scripts/BuildPaclet.wls`,
 for example `JuliaForm-1.2.3.paclet`. The rolling `dev` publisher copies that

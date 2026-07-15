@@ -186,10 +186,11 @@ The checked-in GitHub Actions workflow repeats both paths with Wolfram Engine
 same-repository pull requests, merge-queue groups, strict version tags, and
 manual runs. The `latest` channel uses setup-julia's `'1'` selector for the
 latest stable Julia 1.x release. Wolfram commands run in the private, fully
-licensed runtime managed by `.github/scripts/wolfram-runtime.sh`. Fork pull
-requests cannot receive its image and Docker Hub secrets, so their `CI summary`
-fails explicitly until a maintainer retests the commit from a branch in the
-base repository.
+licensed runtime managed by `.github/scripts/wolfram-runtime.sh`. Its unlimited
+instance concurrency allows the two Julia matrix legs to run simultaneously on
+independent runners. Fork pull requests cannot receive its image and Docker Hub
+secrets, so their `CI summary` fails explicitly until a maintainer retests the
+commit from a branch in the base repository.
 
 The secret-free `Repository config` job is also a required prerequisite. It
 pins actionlint by version and archive SHA-256, checks every workflow shell
