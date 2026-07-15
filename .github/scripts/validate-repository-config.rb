@@ -127,17 +127,7 @@ assert_exact(
     },
     "rules" => [
       { "type" => "deletion" },
-      { "type" => "non_fast_forward" },
-      {
-        "type" => "required_status_checks",
-        "parameters" => {
-          "do_not_enforce_on_create" => true,
-          "required_status_checks" => [
-            { "context" => "CI summary", "integration_id" => 15_368 }
-          ],
-          "strict_required_status_checks_policy" => true
-        }
-      }
+      { "type" => "non_fast_forward" }
     ],
     "bypass_actors" => []
   },

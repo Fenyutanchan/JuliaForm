@@ -496,11 +496,12 @@ safe substitute for this configuration.
 
 Import both `.github/rulesets/protect-main.json` and
 `.github/rulesets/protect-version-tags.json` under repository `Settings` →
-`Rules` → `Rulesets`. The main rule requires the up-to-date `CI summary` check
-from the GitHub Actions App and blocks deletion and force pushes while allowing
-initial branch creation. The tag rule permits initial creation but blocks every
-subsequent update and deletion for tags beginning with `v`; it deliberately
-does not match the mutable `dev` tag. Neither ruleset defines a bypass actor.
+`Rules` → `Rulesets`. The main rule allows direct fast-forward pushes while
+blocking deletion and force pushes. CI validates each accepted main-branch
+commit before the dev publisher can update the rolling prerelease. The tag rule
+permits initial creation but blocks every subsequent update and deletion for
+tags beginning with `v`; it deliberately does not match the mutable `dev` tag.
+Neither ruleset defines a bypass actor.
 
 Repository-wide release immutability is intentionally not enabled because it
 would also lock the rolling prerelease. Stable versions are instead immutable

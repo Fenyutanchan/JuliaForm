@@ -142,7 +142,7 @@ registration so an earlier directory load does not hide a lifecycle bug.
 | `.github/tests/publish-paclet/` | Exercises release publication and interruption recovery with a local `gh` mock |
 | `.github/dependabot.yml` | Maintains immutable GitHub Action pins |
 | `.github/repository-settings/*.json` | Reproducible Actions and environment API payloads |
-| `.github/rulesets/protect-main.json` | Importable main-branch status and history protection |
+| `.github/rulesets/protect-main.json` | Importable main-branch history protection |
 | `.github/rulesets/protect-version-tags.json` | Importable protection for stable version tags |
 | `dist/` | Local `.paclet` build artifacts; not source |
 
@@ -180,14 +180,14 @@ its matching generated case and assertions. The Julia driver does not discover
 or start Wolfram and has no operating-system-specific paths. It can also read a
 previously generated file by accepting that path as its only argument.
 
-Run both commands before opening a pull request. The checked-in GitHub Actions
-workflow repeats both paths with Wolfram Engine 15.0.0 across Julia's `lts` and
-`latest` channels for pushes to `main`, same-repository pull requests,
-merge-queue groups, strict version tags, and manual runs. The `latest` channel
-uses setup-julia's `'1'` selector for the latest stable Julia 1.x release.
-Fork pull requests cannot receive the Wolfram secret, so their `CI summary`
-fails explicitly until a maintainer retests the commit from a branch in the
-base repository.
+Run both commands before opening a pull request or pushing directly to `main`.
+The checked-in GitHub Actions workflow repeats both paths with Wolfram Engine
+15.0.0 across Julia's `lts` and `latest` channels for pushes to `main`,
+same-repository pull requests, merge-queue groups, strict version tags, and
+manual runs. The `latest` channel uses setup-julia's `'1'` selector for the
+latest stable Julia 1.x release. Fork pull requests cannot receive the Wolfram
+secret, so their `CI summary` fails explicitly until a maintainer retests the
+commit from a branch in the base repository.
 
 The secret-free `Repository config` job is also a required prerequisite. It
 pins actionlint by version and archive SHA-256, checks every workflow shell
@@ -292,11 +292,12 @@ deployment policies.
 Import `.github/rulesets/protect-main.json` and
 `.github/rulesets/protect-version-tags.json` from repository `Settings` →
 `Rules` → `Rulesets`. Keep both active without bypass actors. The main rule
-requires the up-to-date `CI summary` from the GitHub Actions App and protects
-branch history. The tag rule allows new `v*` tags but blocks every update and
-deletion after creation, while leaving the rolling `dev` tag mutable. Do not
-enable repository-wide release immutability, because that setting would also
-lock the dev prerelease.
+allows direct fast-forward pushes while blocking branch deletion and history
+rewrites. CI validates each accepted main-branch commit before the dev
+publisher can update the rolling prerelease. The tag rule allows new `v*` tags
+but blocks every update and deletion after creation, while leaving the rolling
+`dev` tag mutable. Do not enable repository-wide release immutability, because
+that setting would also lock the dev prerelease.
 
 The rolling `dev` prerelease is not a stable versioned release. To cut a stable
 release:

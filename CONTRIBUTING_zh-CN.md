@@ -126,7 +126,7 @@ Needs["JuliaForm`"];
 | `.github/tests/publish-paclet/` | 使用本地 `gh` mock 测试发布与中断恢复 |
 | `.github/dependabot.yml` | 维护不可变的 GitHub Action pin |
 | `.github/repository-settings/*.json` | 可复用的 Actions 与 environment API payload |
-| `.github/rulesets/protect-main.json` | 可导入的 main 分支状态与历史保护 |
+| `.github/rulesets/protect-main.json` | 可导入的 main 分支历史保护 |
 | `.github/rulesets/protect-version-tags.json` | 可导入的稳定版本 tag 保护规则 |
 | `dist/` | 本地 `.paclet` 构建产物；不是源文件 |
 
@@ -159,12 +159,13 @@ Wolfram 脚本把渲染器的真实输出写入标准输出。Julia 驱动程序
 也不包含特定操作系统的路径。它还可以接收一个路径作为唯一参数，从先前生成的
 文件读取数据。
 
-提交 pull request 前请运行这两条命令。仓库中的 GitHub Actions 工作流会在
-向 `main` push、同仓库 pull request、merge queue group、严格版本 tag 和手动
-运行时，使用 Wolfram Engine 15.0.0，在 Julia 的 `lts` 与 `latest` 通道上重复
-这两条路径。`latest` 通道使用 setup-julia 的 `'1'` 选择器，即最新稳定的
-Julia 1.x。fork pull request 无法获得 Wolfram secret，因此其 `CI summary`
-会明确失败，直到维护者从同仓库分支复测该 commit。
+提交 pull request 或直接向 `main` push 前，请运行这两条命令。仓库中的
+GitHub Actions 工作流会在向 `main` push、同仓库 pull request、merge queue
+group、严格版本 tag 和手动运行时，使用 Wolfram Engine 15.0.0，在
+Julia 的 `lts` 与 `latest` 通道上重复这两条路径。`latest` 通道使用
+setup-julia 的 `'1'` 选择器，即最新稳定的 Julia 1.x。fork pull request 无法
+获得 Wolfram secret，因此其 `CI summary` 会明确失败，直到维护者从同仓库
+分支复测该 commit。
 
 不读取 secret 的 `Repository config` 作业也是必需前置门禁。它按版本和归档
 SHA-256 固定 actionlint，检查每个工作流 shell 脚本，精确验证受版本控制的
@@ -251,10 +252,11 @@ tag。
 应从仓库 `Settings` → `Rules` → `Rulesets` 导入
 `.github/rulesets/protect-main.json` 和
 `.github/rulesets/protect-version-tags.json`。保持两者 active 且不配置 bypass
-actor。main 规则要求由 GitHub Actions App 产生的最新 `CI summary`，并保护分支
-历史；tag 规则允许创建新的 `v*` tag，但会阻止创建后的任何更新与删除，同时让
-滚动 `dev` tag 保持可变。不要启用仓库级 release immutability，因为该设置也会
-锁定 dev prerelease。
+actor。main 规则允许直接快进 push，同时阻止删除分支和改写历史。CI 会验证
+每个已经进入 main 的 commit，只有通过后 dev 发布器才会更新滚动预发布版本。
+tag 规则允许创建新的 `v*` tag，但会阻止创建后的任何更新与删除，同时让滚动
+`dev` tag 保持可变。不要启用仓库级 release immutability，因为该设置也会锁定
+dev prerelease。
 
 滚动 `dev` 预发布版本不是稳定的版本化 release。要发布稳定版本：
 
