@@ -135,7 +135,7 @@ registration so an earlier directory load does not hide a lifecycle bug.
 | `Scripts/BuildPaclet.wls` | Builds the documentation and `.paclet` archive |
 | `Scripts/PacletBuildSupport.wl` | Builds both documentation languages and enforces artifact integrity |
 | `.github/workflows/CI.yml` | Tests, builds, and orchestrates dev and stable publication |
-| `.github/README.md` | Documents the checked-in repository automation contract |
+| `.github/AUTOMATION.md` | Documents the checked-in repository automation contract |
 | `.github/scripts/check-repository-config.sh` | Runs the local and CI repository-configuration gate |
 | `.github/scripts/validate-repository-config.rb` | Validates settings, rulesets, Dependabot, and workflow policy |
 | `.github/scripts/publish-paclet.sh` | Implements GitHub Release publication |

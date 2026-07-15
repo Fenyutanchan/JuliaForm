@@ -24,6 +24,17 @@ def assert_exact(actual, expected, relative_path)
   assert(actual == expected, "#{relative_path} does not match its required schema and semantics")
 end
 
+github_directory = File.join(ROOT, ".github")
+github_readme_candidates = Dir.children(github_directory).select do |name|
+  name.match?(/\AREADME(?:\..+)?\z/i)
+end
+assert(github_readme_candidates.empty?,
+       ".github must not contain a README that shadows the project README")
+assert(File.file?(File.join(ROOT, "README.md")),
+       "the project README must remain at the repository root")
+assert(File.file?(File.join(github_directory, "AUTOMATION.md")),
+       ".github/AUTOMATION.md must document repository automation")
+
 settings_directory = File.join(ROOT, ".github/repository-settings")
 settings_files = Dir.glob(File.join(settings_directory, "*.json")).sort
 expected_settings_files = %w[

@@ -119,7 +119,7 @@ Needs["JuliaForm`"];
 | `Scripts/BuildPaclet.wls` | 构建文档和 `.paclet` 归档 |
 | `Scripts/PacletBuildSupport.wl` | 构建两种文档语言并执行产物完整性门禁 |
 | `.github/workflows/CI.yml` | 测试、构建并编排 dev 与稳定版本发布 |
-| `.github/README.md` | 说明仓库中受版本控制的自动化契约 |
+| `.github/AUTOMATION.md` | 说明仓库中受版本控制的自动化契约 |
 | `.github/scripts/check-repository-config.sh` | 运行本地与 CI 仓库配置门禁 |
 | `.github/scripts/validate-repository-config.rb` | 验证 settings、rulesets、Dependabot 与工作流策略 |
 | `.github/scripts/publish-paclet.sh` | 实现 GitHub Release 发布 |

@@ -1,5 +1,9 @@
 # Repository automation
 
+> [!IMPORTANT]
+> Keep this document named `AUTOMATION.md`. A `README` file in `.github/`
+> takes precedence over the project-level `README.md` on the repository page.
+
 The `Repository config` CI job runs
 `.github/scripts/check-repository-config.sh`. It pins actionlint 1.7.12 to the
 SHA-256 published with its official release, checks every workflow shell
