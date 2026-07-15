@@ -447,25 +447,27 @@ also included in every validated `.paclet` archive.
 
 On pushes to `main`, same-repository pull requests, merge-queue groups, strict
 `vMAJOR.MINOR.PATCH` tags, and manual runs, `.github/workflows/CI.yml` uses
-Wolfram Engine 15.0.0 and a two-entry Julia matrix covering `lts` and `latest`.
-Ordinary feature-branch pushes are not a second trigger, so an open pull
-request is not billed twice. The `latest` channel maps to setup-julia's `'1'`
-selector for the latest stable Julia 1.x release. After both matrix legs pass,
-the latest leg builds and independently validates the `.paclet`, then uploads
-it as `JuliaForm-paclet` with seven-day retention. A secret-free `Repository
-config` job also pins and runs actionlint, validates every checked-in policy,
-and exercises the publisher with a local `gh` mock. The single `CI summary`
-job requires both configuration and test gates. Only pull-request runs cancel
-obsolete work; main and tag runs cannot be interrupted while approaching
-publication.
+the repository's private, fully licensed Wolfram 15.0.0 runtime and a two-entry
+Julia matrix covering `lts` and `latest`. Ordinary feature-branch pushes are
+not a second trigger, so an open pull request is not billed twice. The `latest`
+channel maps to setup-julia's `'1'` selector for the latest stable Julia 1.x
+release. After both matrix legs pass, the latest leg builds and independently
+validates the `.paclet`, then uploads it as `JuliaForm-paclet` with seven-day
+retention. A secret-free `Repository config` job also pins and runs actionlint,
+validates every checked-in policy, and exercises the publisher with a local
+`gh` mock. The single `CI summary` job requires both configuration and test
+gates. Only pull-request runs cancel obsolete work; main and tag runs cannot be
+interrupted while approaching publication.
 
 All GitHub Actions use full commit SHA pins with human-readable version
-comments, and the Wolfram container uses an image digest. Repository Actions
-settings should require SHA pinning and allow only GitHub-owned actions plus
-`julia-actions/setup-julia`; `.github/dependabot.yml` maintains these pins
-weekly. The API payloads under `.github/repository-settings/` make these
-settings and the environment policies reproducible. Test jobs have only
-`contents: read`, while preflight and summary jobs receive no token permissions.
+comments. Set `WOLFRAM_RUNTIME_IMAGE` to an immutable digest reference whenever
+possible; CI also requires the started runtime to report exactly Wolfram
+15.0.0 before tests begin. Repository Actions settings should require SHA
+pinning and allow only GitHub-owned actions plus `julia-actions/setup-julia`;
+`.github/dependabot.yml` maintains these pins weekly. The API payloads under
+`.github/repository-settings/` make these settings and the environment policies
+reproducible. Test jobs have only `contents: read`, while preflight and summary
+jobs receive no token permissions.
 
 A push to `main` also starts an independent `publish-dev` job. This job sparsely
 checks out only the release helper, downloads the artifact that just passed
@@ -509,24 +511,27 @@ by project policy: the tag ruleset prevents their refs from moving, and CI
 refuses to overwrite an existing published Release. Corrections require a new
 patch version.
 
-Before the first run, also create an on-demand license entitlement in Wolfram
-Language:
+Before the first run, configure these repository Actions secrets:
 
-```wl
-entitlement = CreateLicenseEntitlement[];
-entitlement["EntitlementID"]
-```
+| Secret | Required value |
+| --- | --- |
+| `WOLFRAM_RUNTIME_IMAGE` | Complete Docker reference for the private Wolfram 15.0.0 image; prefer `namespace/repository@sha256:...` |
+| `DOCKERHUB_USERNAME` | Docker Hub account allowed to pull that image |
+| `DOCKERHUB_TOKEN` | Read-only Docker Hub access token for that account |
 
-Store the returned value as the repository secret
-`WOLFRAMSCRIPT_ENTITLEMENTID` under GitHub repository `Settings` →
-`Secrets and variables` → `Actions`. This license consumes Wolfram Service
-Credits; configure its validity, concurrent kernel count, and cost policy for
-the account. See
-[Wolfram's PacletCICD license documentation](https://resources.wolframcloud.com/PacletRepository/resources/Wolfram/PacletCICD/tutorial/LicenseEntitlementsAndRepositorySecrets.html)
-for details.
+The image must provide a noninteractive, fully licensed Linux amd64
+`wolframscript`, must support execution as root, and must contain `tail`. The
+workflow deliberately does not use `jobs.<job_id>.container`: GitHub permits
+secrets in container credentials but not in
+[`container.image`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability).
+Instead, `.github/scripts/wolfram-runtime.sh` uses an isolated Docker
+authentication directory on the runner, pulls the secret image, mounts the
+checkout at `/workspace`, and keeps one container alive for the complete test
+leg. The always-run cleanup removes the container and logs out. The obsolete
+`WOLFRAMSCRIPT_ENTITLEMENTID` secret is not read.
 
 GitHub does not expose repository secrets to pull requests from forks. Such a
 pull request runs preflight but its `CI summary` deliberately fails instead of
 reporting a false green check. A maintainer must retest the commit from a branch
-in the base repository that can access the secret. Do not use
+in the base repository that can access the private-runtime secrets. Do not use
 `pull_request_target` to execute pull-request code.

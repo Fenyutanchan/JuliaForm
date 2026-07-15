@@ -10,6 +10,15 @@ SHA-256 published with its official release, checks every workflow shell
 script, validates Dependabot and the checked-in repository policy JSON, and
 runs the release publisher against the local `gh` mock.
 
+The test matrix uses `.github/scripts/wolfram-runtime.sh` to authenticate to
+Docker Hub with an isolated client configuration, pull the private runtime
+named by `WOLFRAM_RUNTIME_IMAGE`, and execute every Wolfram command in one
+root-owned container with the checkout mounted at `/workspace`. Startup fails
+unless the runtime reports Wolfram 15.0.0. The workflow always removes the
+container and logs out; it never reads the legacy on-demand entitlement secret.
+The repository-config gate exercises this lifecycle against a local Docker
+mock without exposing or requiring real credentials.
+
 Stable releases preserve the paclet name produced by `Scripts/BuildPaclet.wls`,
 for example `JuliaForm-1.2.3.paclet`. The rolling `dev` publisher copies that
 same built archive to a commit-unique release-asset name such as

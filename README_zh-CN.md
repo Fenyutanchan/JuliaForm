@@ -391,22 +391,23 @@ JuliaForm 采用 [MIT License](LICENSE) 发布。每个通过验证的 `.paclet`
 ## GitHub Actions CI
 
 `.github/workflows/CI.yml` 会在向 `main` push、同仓库 pull request、merge queue
-group、严格的 `vMAJOR.MINOR.PATCH` tag 和手动触发时，使用 Wolfram Engine
-15.0.0 与包含 `lts`、`latest` 的双项 Julia 矩阵运行测试。普通功能分支 push
-不是第二个触发源，因此已打开的 pull request 不会重复计费。`latest` 通道映射
-到 setup-julia 的 `'1'` 选择器，即最新稳定的 Julia 1.x。两个矩阵项都通过后，
-latest 项会构建并独立验证 `.paclet`，再以 `JuliaForm-paclet` 名称保留 7 天。
-不读取 secret 的 `Repository config` 作业还会固定并运行 actionlint、验证每份
-受版本控制的策略，并用本地 `gh` mock 测试发布器。唯一的 `CI summary` 作业要求
-配置与测试门禁都成功。只有 pull-request 运行会取消过时工作；main 和 tag 运行
-在接近发布时不会被中断。
+group、严格的 `vMAJOR.MINOR.PATCH` tag 和手动触发时，使用仓库的私有、完整授权
+Wolfram 15.0.0 运行时与包含 `lts`、`latest` 的双项 Julia 矩阵运行测试。普通功能
+分支 push 不是第二个触发源，因此已打开的 pull request 不会重复计费。`latest`
+通道映射到 setup-julia 的 `'1'` 选择器，即最新稳定的 Julia 1.x。两个矩阵项都
+通过后，latest 项会构建并独立验证 `.paclet`，再以 `JuliaForm-paclet` 名称保留
+7 天。不读取 secret 的 `Repository config` 作业还会固定并运行 actionlint、验证
+每份受版本控制的策略，并用本地 `gh` mock 测试发布器。唯一的 `CI summary` 作业
+要求配置与测试门禁都成功。只有 pull-request 运行会取消过时工作；main 和 tag
+运行在接近发布时不会被中断。
 
-所有 GitHub Action 都固定到完整 commit SHA，并保留便于阅读的版本注释；Wolfram
-容器固定到 image digest。仓库 Actions 设置应强制 SHA pin，并且只允许 GitHub
-自有 Action 与 `julia-actions/setup-julia`；`.github/dependabot.yml` 每周维护这些
-pin。`.github/repository-settings/` 下的 API payload 使这些设置与 environment
-策略可以复现。测试作业只有 `contents: read`，preflight 与 summary 作业没有
-token 权限。
+所有 GitHub Action 都固定到完整 commit SHA，并保留便于阅读的版本注释。应尽量
+把 `WOLFRAM_RUNTIME_IMAGE` 设为不可变的 digest reference；CI 还会在测试前要求
+启动的运行时准确报告 Wolfram 15.0.0。仓库 Actions 设置应强制 SHA pin，并且只
+允许 GitHub 自有 Action 与 `julia-actions/setup-julia`；`.github/dependabot.yml`
+每周维护这些 pin。`.github/repository-settings/` 下的 API payload 使这些设置与
+environment 策略可以复现。测试作业只有 `contents: read`，preflight 与 summary
+作业没有 token 权限。
 
 `main` 分支的 push 还会启动独立的 `publish-dev` 作业。该作业只稀疏检出发布
 辅助脚本，下载刚刚通过验证的 artifact，并通过 GitHub environment `dev` 更新
@@ -442,19 +443,24 @@ dev 发布器才会更新滚动预发布版本。tag 规则允许首次创建，
 稳定版本改由项目策略保证不可变：tag ruleset 阻止移动对应 ref，CI 则拒绝覆盖
 已经发布的 Release。需要修正时必须发布新的补丁版本。
 
-首次运行前，需要在 Wolfram Language 中创建 on-demand license entitlement：
+首次运行前，需要配置以下 repository Actions secrets：
 
-```wl
-entitlement = CreateLicenseEntitlement[];
-entitlement["EntitlementID"]
-```
+| Secret | 必需值 |
+| --- | --- |
+| `WOLFRAM_RUNTIME_IMAGE` | 私有 Wolfram 15.0.0 镜像的完整 Docker reference；推荐使用 `namespace/repository@sha256:...` |
+| `DOCKERHUB_USERNAME` | 有权拉取该镜像的 Docker Hub 账户 |
+| `DOCKERHUB_TOKEN` | 该账户的只读 Docker Hub access token |
 
-然后把返回值保存为 repository secret `WOLFRAMSCRIPT_ENTITLEMENTID`；位置是
-GitHub 仓库的 `Settings` → `Secrets and variables` → `Actions`。此许可会
-消耗 Wolfram Service Credits；有效期、并发内核数和费用策略应按账户情况配置。
-具体设置见 [Wolfram 的 PacletCICD 许可说明](https://resources.wolframcloud.com/PacletRepository/resources/Wolfram/PacletCICD/tutorial/LicenseEntitlementsAndRepositorySecrets.html)。
+镜像必须提供可非交互运行、已完整授权的 Linux amd64 `wolframscript`，支持以 root
+执行，并包含 `tail`。工作流有意不使用 `jobs.<job_id>.container`：GitHub 允许在
+container credentials 中使用 secrets，却不允许在
+[`container.image`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability)
+中使用。`.github/scripts/wolfram-runtime.sh` 因此改在 runner 上使用隔离的 Docker
+认证目录，拉取 secret 指定的镜像，把 checkout 挂载到 `/workspace`，并让同一个
+容器服务完整测试项；无条件运行的清理步骤会删除容器并登出。已经废弃的
+`WOLFRAMSCRIPT_ENTITLEMENTID` secret 不再被读取。
 
 GitHub 不向来自 fork 的 pull request 提供 repository secrets。这类 PR 会运行
 preflight，但其 `CI summary` 会明确失败，而不会给出假绿结果。维护者必须把
-该 commit 放到能访问 secret 的同仓库分支复测；不要改用
+该 commit 放到能访问私有运行时 secrets 的同仓库分支复测；不要改用
 `pull_request_target` 执行 PR 中的代码。

@@ -201,11 +201,32 @@ required_workflow_fragments = [
   "needs.repository-config.result == 'success'",
   "REPOSITORY_CONFIG_RESULT: ${{ needs.repository-config.result }}",
   'if [[ "${REPOSITORY_CONFIG_RESULT}" != "success" ]]',
+  "DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}",
+  "DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}",
+  "WOLFRAM_RUNTIME_IMAGE: ${{ secrets.WOLFRAM_RUNTIME_IMAGE }}",
+  "bash .github/scripts/wolfram-runtime.sh start",
+  "bash .github/scripts/wolfram-runtime.sh exec",
+  "bash .github/scripts/wolfram-runtime.sh stop",
   "julia --startup-file=no --check-bounds=yes Tests/JuliaValidation.jl"
 ]
 required_workflow_fragments.each do |fragment|
-  assert(workflow.include?(fragment), "CI workflow is missing repository-config gate: #{fragment}")
+  assert(workflow.include?(fragment), "CI workflow is missing a required policy fragment: #{fragment}")
 end
+
+forbidden_workflow_fragments = [
+  "WOLFRAMSCRIPT_ENTITLEMENTID",
+  "wolframresearch/wolframengine"
+]
+forbidden_workflow_fragments.each do |fragment|
+  assert(!workflow.include?(fragment), "CI workflow retains obsolete Wolfram configuration: #{fragment}")
+end
+
+test_block = workflow[/^  test:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\z)/m, 1]
+assert(test_block, "CI workflow is missing the test job body")
+assert(!test_block.match?(/^    container:/),
+       "test job must not use jobs.<job_id>.container because its image cannot read secrets")
+assert(test_block.include?("if: ${{ always() }}"),
+       "test job must clean up the private Wolfram runtime unconditionally")
 
 repository_config_block = workflow[/^  repository-config:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\z)/m, 1]
 assert(repository_config_block, "CI workflow is missing the repository-config job body")
@@ -213,5 +234,10 @@ assert(repository_config_block.include?("contents: read"),
        "repository-config job must have contents: read")
 assert(!repository_config_block.include?("secrets."),
        "repository-config job must not read secrets")
+
+assert(File.file?(File.join(ROOT, ".github/scripts/wolfram-runtime.sh")),
+       "private Wolfram runtime helper is missing")
+assert(File.file?(File.join(ROOT, ".github/tests/wolfram-runtime/run-tests.sh")),
+       "private Wolfram runtime mock tests are missing")
 
 puts "Repository settings, rulesets, Dependabot, and workflow policy are valid."
