@@ -1,0 +1,4 @@
+PackageInitialize[
+    "JuliaForm`",
+    <|"SymbolsToProtect" -> {"JuliaForm"}|>
+]

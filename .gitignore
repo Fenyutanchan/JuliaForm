@@ -1,0 +1,3 @@
+*.paclet
+/dist/
+.DS_Store

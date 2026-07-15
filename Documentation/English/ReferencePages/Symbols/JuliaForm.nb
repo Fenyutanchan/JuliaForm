@@ -1,0 +1,634 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 15.0' *)
+
+Notebook[{
+Cell[TextData[{
+    "New in: ",
+    Cell["0.1.0", "HistoryData", CellTags -> "New"],
+    " | Modified in: ",
+    Cell[" ", "HistoryData", CellTags -> "Modified"],
+    " | Obsolete in: ",
+    Cell[" ", "HistoryData", CellTags -> "Obsolete"]
+}], "History", CellID -> 1000001],
+
+Cell[CellGroupData[{
+Cell["Categorization", "CategorizationSection", CellID -> 1000002],
+Cell["Symbol", "Categorization",
+    CellLabel -> "Entity Type", CellID -> 1000003],
+Cell["JuliaForm", "Categorization",
+    CellLabel -> "Paclet Name", CellID -> 1000004],
+Cell["JuliaForm\:0060", "Categorization",
+    CellLabel -> "Context", CellID -> 1000005],
+Cell["JuliaForm/ref/JuliaForm", "Categorization",
+    CellLabel -> "URI", CellID -> 1000006]
+}, Closed]],
+
+Cell[CellGroupData[{
+Cell["Keywords", "KeywordsSection", CellID -> 1000007],
+Cell[
+    "Julia; code generation; expression rendering; output form; interoperability",
+    "Keywords",
+    CellID -> 1000008
+]
+}, Closed]],
+
+Cell[CellGroupData[{
+Cell["Syntax Templates", "TemplatesSection", CellID -> 1000009],
+Cell[BoxData[""], "Template",
+    CellLabel -> "Additional Function Template", CellID -> 1000010],
+Cell[BoxData[""], "Template",
+    CellLabel -> "Arguments Pattern", CellID -> 1000011],
+Cell[BoxData[""], "Template",
+    CellLabel -> "Local Variables", CellID -> 1000012],
+Cell[BoxData[""], "Template",
+    CellLabel -> "Color Equal Signs", CellID -> 1000013]
+}, Closed]],
+
+Cell[CellGroupData[{
+Cell["JuliaForm", "ObjectName", CellID -> 1000014],
+
+Cell[TextData[{
+    Cell["   ", "ModInfo"],
+    Cell[BoxData[
+        RowBox[{"JuliaForm", "[", StyleBox["expr", "TI"], "]"}]
+    ], "InlineFormula"],
+    "\[LineSeparator]displays ",
+    Cell[BoxData[StyleBox["expr", "TI"]], "InlineFormula"],
+    " as a Julia language expression.",
+    "\n",
+    Cell["   ", "ModInfo"],
+    Cell[BoxData[
+        RowBox[{
+            "ToString", "[",
+            RowBox[{
+                RowBox[{
+                    "JuliaForm", "[", StyleBox["expr", "TI"], "]"
+                }],
+                ",", "OutputForm"
+            }],
+            "]"
+        }]
+    ], "InlineFormula"],
+    "\[LineSeparator]returns the rendered Julia source as a string.",
+    "\n",
+    Cell["   ", "ModInfo"],
+    Cell[BoxData[
+        RowBox[{
+            "ToString", "[",
+            RowBox[{StyleBox["expr", "TI"], ",", "JuliaForm"}],
+            "]"
+        }]
+    ], "InlineFormula"],
+    "\[LineSeparator]is a compatibility form that returns the same source string."
+}], "Usage", CellID -> 1000015],
+
+Cell[TextData[{
+    Cell[BoxData["JuliaForm"], "InlineFormula"],
+    " is an output form for individual expressions, not a complete Wolfram Language ",
+    "to Julia program translator."
+}], "Notes", CellID -> 1000016],
+
+Cell[TextData[{
+    "The argument evaluates once according to ordinary Wolfram Language semantics ",
+    "before it is rendered. Wrap an expression in ",
+    Cell[BoxData[
+        ButtonBox["HoldForm",
+            BaseStyle -> "Link",
+            ButtonData -> "paclet:ref/HoldForm"]
+    ], "InlineFormula"],
+    " when its arithmetic structure must be retained."
+}], "Notes", CellID -> 1000017],
+
+Cell[TextData[{
+    "Output is deterministic, single-line UTF-8 source. ",
+    Cell[BoxData["JuliaForm"], "InlineFormula"],
+    " accepts exactly one argument and has no options."
+}], "Notes", CellID -> 1000018],
+
+Cell[TextData[{
+    "Unsupported constructs issue ",
+    Cell[BoxData[
+        RowBox[{"JuliaForm", "::", "unsupported"}]
+    ], "InlineFormula"],
+    " and return ",
+    Cell[BoxData["$Failed"], "InlineFormula"],
+    ". Assignments, patterns, scoping constructs, loops, delayed rules, sparse ",
+    "arrays, quantities, and rank-three or higher literal lists are intentionally ",
+    "rejected. Unsafe mapped-function arities, comparisons whose Julia result ",
+    "would change Wolfram semantics, and Eigenvalues are also rejected."
+}], "Notes", CellID -> 1000019],
+
+Cell[TextData[{
+    "Integers, rationals, complex numbers, and arbitrary-precision real numbers ",
+    "retain exactness or explicit precision where Julia provides a faithful ",
+    "representation. Strings escape Julia interpolation and control characters."
+}], "Notes", CellID -> 1000020],
+
+Cell[TextData[{
+    Cell[BoxData["Rule"], "InlineFormula"],
+    " renders as a Julia ",
+    Cell[BoxData["Pair"], "InlineFormula"],
+    ", not as a Wolfram Language replacement rule. Associations render as ",
+    Cell[BoxData["Dict"], "InlineFormula"],
+    " constructors after strict-key checks; unsafe container keys or key ",
+    "collisions fail explicitly."
+}], "Notes", CellID -> 1000021],
+
+Cell[TextData[{
+    "Unknown symbolic heads render as Julia calls with the same name. The Julia ",
+    "environment must define those calls. Mappings such as ",
+    Cell[BoxData["Det"], "InlineFormula"],
+    " to ",
+    Cell[BoxData["det"], "InlineFormula"],
+    " require Julia's ",
+    Cell[BoxData["LinearAlgebra"], "InlineFormula"],
+    " standard library."
+}], "Notes", CellID -> 1000022],
+
+Cell[TextData[{
+    Cell[BoxData["Part"], "InlineFormula"],
+    " emits a self-contained local dispatcher that applies selectors by ",
+    "Wolfram dimension, supports regular and ragged arrays, maps ordinal ",
+    "selectors to custom Julia axes through scalar indexing, and preserves ",
+    "valid empty Span selections. A literal Association retains ordered ",
+    "positional selection; an arbitrary runtime Dict accepts only unambiguous ",
+    Cell[BoxData[
+        RowBox[{"Key", "[", StyleBox["key", "TI"], "]"}]
+    ], "InlineFormula"],
+    "."
+}], "Notes", CellID -> 1000023]
+}, Open]],
+
+Cell[CellGroupData[{
+Cell["See Also", "SeeAlsoSection", CellID -> 1000024],
+Cell[TextData[{
+    Cell[BoxData[
+        ButtonBox["CForm",
+            BaseStyle -> "Link",
+            ButtonData -> "paclet:ref/CForm"]
+    ], "InlineFormula"],
+    "\[NonBreakingSpace]\[FilledVerySmallSquare]\[NonBreakingSpace]",
+    Cell[BoxData[
+        ButtonBox["FortranForm",
+            BaseStyle -> "Link",
+            ButtonData -> "paclet:ref/FortranForm"]
+    ], "InlineFormula"],
+    "\[NonBreakingSpace]\[FilledVerySmallSquare]\[NonBreakingSpace]",
+    Cell[BoxData[
+        ButtonBox["OutputForm",
+            BaseStyle -> "Link",
+            ButtonData -> "paclet:ref/OutputForm"]
+    ], "InlineFormula"],
+    "\[NonBreakingSpace]\[FilledVerySmallSquare]\[NonBreakingSpace]",
+    Cell[BoxData[
+        ButtonBox["ToString",
+            BaseStyle -> "Link",
+            ButtonData -> "paclet:ref/ToString"]
+    ], "InlineFormula"],
+    "\[NonBreakingSpace]\[FilledVerySmallSquare]\[NonBreakingSpace]",
+    Cell[BoxData[
+        ButtonBox["HoldForm",
+            BaseStyle -> "Link",
+            ButtonData -> "paclet:ref/HoldForm"]
+    ], "InlineFormula"],
+    "\[NonBreakingSpace]\[FilledVerySmallSquare]\[NonBreakingSpace]",
+    Cell[BoxData[
+        ButtonBox["Part",
+            BaseStyle -> "Link",
+            ButtonData -> "paclet:ref/Part"]
+    ], "InlineFormula"]
+}], "SeeAlso", CellID -> 1000025]
+}, Open]],
+
+Cell[CellGroupData[{
+Cell["Examples", "PrimaryExamplesSection", CellID -> 1000026],
+
+Cell[BoxData[
+    RowBox[{"Needs", "[", "\"JuliaForm\:0060\"", "]"}]
+], "Input", CellLabel -> "In[1]:=", CellID -> 1000027],
+
+Cell["Render a held quotient while preserving its parentheses:", "ExampleText",
+    CellID -> 1000028],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        "ToString", "[",
+        RowBox[{
+            RowBox[{
+                "JuliaForm", "[",
+                RowBox[{
+                    "HoldForm", "[",
+                    RowBox[{
+                        "a", "/",
+                        RowBox[{"(", RowBox[{"b", "+", "c"}], ")"}]
+                    }],
+                    "]"
+                }],
+                "]"
+            }],
+            ",", "OutputForm"
+        }],
+        "]"
+    }]
+], "Input", CellLabel -> "In[2]:=", CellID -> 1000029],
+Cell[BoxData["\<\"a / (b + c)\"\>"], "Output",
+    CellLabel -> "Out[2]=", CellID -> 1000030]
+}, Open]],
+
+Cell["Render a rectangular list as a Julia matrix literal:", "ExampleText",
+    CellID -> 1000031],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        "ToString", "[",
+        RowBox[{
+            RowBox[{
+                "JuliaForm", "[",
+                RowBox[{"{",
+                    RowBox[{
+                        RowBox[{"{", RowBox[{"1", ",", "2"}], "}"}],
+                        ",",
+                        RowBox[{"{", RowBox[{"3", ",", "4"}], "}"}]
+                    }],
+                    "}"
+                }],
+                "]"
+            }],
+            ",", "OutputForm"
+        }],
+        "]"
+    }]
+], "Input", CellLabel -> "In[3]:=", CellID -> 1000032],
+Cell[BoxData["\<\"[1 2; 3 4]\"\>"], "Output",
+    CellLabel -> "Out[3]=", CellID -> 1000033]
+}, Open]],
+
+Cell["Render an association as a Julia dictionary constructor:", "ExampleText",
+    CellID -> 1000034],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        "StringQ", "[",
+        RowBox[{
+            "ToString", "[",
+            RowBox[{
+                RowBox[{
+                    "JuliaForm", "[",
+                    RowBox[{"<|",
+                        RowBox[{
+                            RowBox[{"\"x\"", "\[Rule]", "1"}],
+                            ",",
+                            RowBox[{
+                                "\"y\"", "\[Rule]",
+                                RowBox[{"{", RowBox[{"2", ",", "3"}], "}"}]
+                            }]
+                        }],
+                        "|>"
+                    }],
+                    "]"
+                }],
+                ",", "OutputForm"
+            }],
+            "]"
+        }],
+        "]"
+    }]
+], "Input", CellLabel -> "In[4]:=", CellID -> 1000035],
+Cell[BoxData["True"],
+    "Output", CellLabel -> "Out[4]=", CellID -> 1000036]
+}, Open]]
+}, Open]],
+
+Cell[CellGroupData[{
+Cell["Scope", "ExtendedExamplesSection",
+    CellTags -> "ExtendedExamples", CellID -> 1000037],
+
+Cell[CellGroupData[{
+Cell["Numbers and constants", "ExampleSection", CellID -> 1000038],
+
+Cell["Exact rationals use Julia's rational constructor:", "ExampleText",
+    CellID -> 1000039],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        "ToString", "[",
+        RowBox[{
+            RowBox[{"JuliaForm", "[", FractionBox["1", "3"], "]"}],
+            ",", "OutputForm"
+        }],
+        "]"
+    }]
+], "Input", CellLabel -> "In[5]:=", CellID -> 1000040],
+Cell[BoxData["\<\"1 // 3\"\>"], "Output",
+    CellLabel -> "Out[5]=", CellID -> 1000041]
+}, Open]],
+
+Cell["Arbitrary-precision reals carry an explicit binary precision:", "ExampleText",
+    CellID -> 1000042],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        "ToString", "[",
+        RowBox[{
+            RowBox[{"JuliaForm", "[", "1.25`30", "]"}],
+            ",", "OutputForm"
+        }],
+        "]"
+    }]
+], "Input", CellLabel -> "In[6]:=", CellID -> 1000043],
+Cell[BoxData[
+    "\<\"BigFloat(\\\"1.25\\\"; precision = 100)\"\>"
+], "Output", CellLabel -> "Out[6]=", CellID -> 1000044]
+}, Open]]
+}, Open]],
+
+Cell[CellGroupData[{
+Cell["Conditions and functions", "ExampleSection", CellID -> 1000045],
+
+Cell["Expression-level conditions render as Julia ternary expressions:",
+    "ExampleText", CellID -> 1000046],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        "ToString", "[",
+        RowBox[{
+            RowBox[{
+                "JuliaForm", "[",
+                RowBox[{
+                    "HoldForm", "[",
+                    RowBox[{
+                        "If", "[",
+                        RowBox[{
+                            RowBox[{"x", ">", "0"}],
+                            ",", "x", ",",
+                            RowBox[{"-", "x"}]
+                        }],
+                        "]"
+                    }],
+                    "]"
+                }],
+                "]"
+            }],
+            ",", "OutputForm"
+        }],
+        "]"
+    }]
+], "Input", CellLabel -> "In[7]:=", CellID -> 1000047],
+Cell[BoxData["\<\"x > 0 ? x : -x\"\>"], "Output",
+    CellLabel -> "Out[7]=", CellID -> 1000048]
+}, Open]],
+
+Cell["Mappings account for cross-language convention differences:", "ExampleText",
+    CellID -> 1000049],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        "ToString", "[",
+        RowBox[{
+            RowBox[{"JuliaForm", "[",
+                RowBox[{"{",
+                    RowBox[{
+                        RowBox[{"ArcTan", "[", RowBox[{"x", ",", "y"}], "]"}],
+                        ",",
+                        RowBox[{"Sinc", "[", "x", "]"}],
+                        ",",
+                        RowBox[{"Quotient", "[", RowBox[{"x", ",", "y"}], "]"}]
+                    }],
+                    "}"
+                }],
+                "]"
+            }],
+            ",", "OutputForm"
+        }],
+        "]"
+    }]
+], "Input", CellLabel -> "In[8]:=", CellID -> 1000050],
+Cell[BoxData["\<\"[atan(y, x), sinc(x / pi), fld(x, y)]\"\>"], "Output",
+    CellLabel -> "Out[8]=", CellID -> 1000051]
+}, Open]]
+}, Open]],
+
+Cell[CellGroupData[{
+Cell["Indexing", "ExampleSection", CellID -> 1000052],
+
+Cell["Generated source uses a local dispatcher for negative and All selectors:", "ExampleText",
+    CellID -> 1000053],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{"StringQ", "[",
+        RowBox[{
+            "ToString", "[",
+            RowBox[{
+                RowBox[{
+                    "JuliaForm", "[",
+                    RowBox[{
+                        "HoldForm", "[",
+                        RowBox[{"m", "[",
+                            RowBox[{"[",
+                                RowBox[{
+                                    RowBox[{"-", "1"}], ",", "All"
+                                }],
+                                "]"
+                            }],
+                            "]"
+                        }],
+                        "]"
+                    }],
+                    "]"
+                }],
+                ",", "OutputForm"
+            }],
+            "]"
+        }],
+        "]"}]
+], "Input", CellLabel -> "In[9]:=", CellID -> 1000054],
+Cell[BoxData["True"], "Output",
+    CellLabel -> "Out[9]=", CellID -> 1000055]
+}, Open]],
+
+Cell["Span selection remains first-dimensional and fills omitted trailing axes:", "ExampleText",
+    CellID -> 1000056],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{"StringQ", "[",
+        RowBox[{
+            "ToString", "[",
+            RowBox[{
+                RowBox[{
+                    "JuliaForm", "[",
+                    RowBox[{
+                        "HoldForm", "[",
+                        RowBox[{"v", "[",
+                            RowBox[{"[",
+                                RowBox[{"2", ";;", RowBox[{"-", "1"}]}],
+                                "]"
+                            }],
+                            "]"
+                        }],
+                        "]"
+                    }],
+                    "]"
+                }],
+                ",", "OutputForm"
+            }],
+            "]"
+        }],
+        "]"}]
+], "Input", CellLabel -> "In[10]:=", CellID -> 1000057],
+Cell[BoxData["True"], "Output", CellLabel -> "Out[10]=", CellID -> 1000058]
+}, Open]]
+}, Open]],
+
+Cell[CellGroupData[{
+Cell["Properties and relations", "ExampleSection", CellID -> 1000059],
+
+Cell["The two string-producing forms are equivalent:", "ExampleText",
+    CellID -> 1000060],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        RowBox[{
+            "ToString", "[",
+            RowBox[{
+                RowBox[{
+                    "HoldForm", "[",
+                    RowBox[{
+                        "a", "/",
+                        RowBox[{"(", RowBox[{"b", "+", "c"}], ")"}]
+                    }],
+                    "]"
+                }],
+                ",", "JuliaForm"
+            }],
+            "]"
+        }],
+        "===",
+        RowBox[{
+            "ToString", "[",
+            RowBox[{
+                RowBox[{
+                    "JuliaForm", "[",
+                    RowBox[{
+                        "HoldForm", "[",
+                        RowBox[{
+                            "a", "/",
+                            RowBox[{"(", RowBox[{"b", "+", "c"}], ")"}]
+                        }],
+                        "]"
+                    }],
+                    "]"
+                }],
+                ",", "OutputForm"
+            }],
+            "]"
+        }]
+    }]
+], "Input", CellLabel -> "In[11]:=", CellID -> 1000061],
+Cell[BoxData["True"], "Output",
+    CellLabel -> "Out[11]=", CellID -> 1000062]
+}, Open]],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{"Options", "[", "JuliaForm", "]"}]
+], "Input", CellLabel -> "In[12]:=", CellID -> 1000063],
+Cell[BoxData[
+    RowBox[{"{", "}"}]
+], "Output", CellLabel -> "Out[12]=", CellID -> 1000064]
+}, Open]]
+}, Open]],
+
+Cell[CellGroupData[{
+Cell["Possible issues", "ExampleSection", CellID -> 1000065],
+
+Cell[
+    "Unknown functions are emitted by name and must exist in the Julia environment:",
+    "ExampleText",
+    CellID -> 1000066
+],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        "ToString", "[",
+        RowBox[{
+            RowBox[{
+                "JuliaForm", "[",
+                RowBox[{"BesselJ", "[", RowBox[{"0", ",", "x"}], "]"}],
+                "]"
+            }],
+            ",", "OutputForm"
+        }],
+        "]"
+    }]
+], "Input", CellLabel -> "In[13]:=", CellID -> 1000067],
+Cell[BoxData["\<\"BesselJ(0, x)\"\>"], "Output",
+    CellLabel -> "Out[13]=", CellID -> 1000068]
+}, Open]],
+
+Cell[
+    "Unsafe program constructs are rejected instead of being approximated:",
+    "ExampleText",
+    CellID -> 1000069
+],
+
+Cell[CellGroupData[{
+Cell[BoxData[
+    RowBox[{
+        "Quiet", "[",
+        RowBox[{
+            RowBox[{
+                "ToString", "[",
+                RowBox[{
+                    RowBox[{
+                        "JuliaForm", "[",
+                        RowBox[{
+                            "HoldForm", "[",
+                            RowBox[{"x", "+=", "1"}],
+                            "]"
+                        }],
+                        "]"
+                    }],
+                    ",", "OutputForm"
+                }],
+                "]"
+            }],
+            ",",
+            RowBox[{"JuliaForm", "::", "unsupported"}]
+        }],
+        "]"
+    }]
+], "Input", CellLabel -> "In[14]:=", CellID -> 1000070],
+Cell[BoxData["\<\"$Failed\"\>"], "Output",
+    CellLabel -> "Out[14]=", CellID -> 1000071]
+}, Open]]
+}, Open]]
+}, Open]]
+},
+WindowSize -> {900, 900},
+WindowMargins -> {{Automatic, 100}, {Automatic, 100}},
+TaggingRules -> <|"Paclet" -> "JuliaForm"|>,
+CellContext -> "Global\:0060",
+FrontEndVersion -> "15.0 for Mac OS X ARM (64-bit) (May 19, 2026)",
+StyleDefinitions -> FrontEnd`FileName[
+    {"Wolfram"},
+    "FunctionPageStylesExt.nb",
+    CharacterEncoding -> "UTF-8"
+]
+]
+
+(* End of Notebook Content *)

@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+printf '%q ' "$@" >> "${MOCK_STATE}/calls.log"
+printf '\n' >> "${MOCK_STATE}/calls.log"
+
+if [[ "$1" == "release" && "$2" == "view" ]]; then
+  if [[ "$4" == "--json" && "$5" == "isDraft" ]]; then
+    if [[ -f "${MOCK_STATE}/release" ]]; then
+      cat "${MOCK_STATE}/draft"
+    else
+      echo "release not found (HTTP 404)" >&2
+      exit 1
+    fi
+  elif [[ "$4" == "--json" && "$5" == "assets" ]]; then
+    if [[ "${MOCK_FAIL_ASSET_LIST:-0}" == "1" ]]; then
+      echo "simulated asset-list failure" >&2
+      exit 1
+    fi
+    cat "${MOCK_STATE}/assets"
+  elif [[ "$4" == "--json" && "$5" == "tagName,name,isDraft,isPrerelease" ]]; then
+    printf '%s\t%s\t%s\t%s\n' \
+      "$(cat "${MOCK_STATE}/release-tag")" \
+      "$(cat "${MOCK_STATE}/release-title")" \
+      "$(cat "${MOCK_STATE}/draft")" \
+      "$(cat "${MOCK_STATE}/prerelease")"
+  else
+    echo "unexpected release view invocation" >&2
+    exit 70
+  fi
+  exit 0
+fi
+
+if [[ "$1" == "release" && "$2" == "create" ]]; then
+  tag="$3"
+  title=""
+  prerelease=false
+  shift 3
+  while (( $# > 0 )); do
+    case "$1" in
+      --title)
+        title="$2"
+        shift 2
+        ;;
+      --prerelease)
+        prerelease=true
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  touch "${MOCK_STATE}/release" "${MOCK_STATE}/tag"
+  printf '%s\n' "${tag}" > "${MOCK_STATE}/release-tag"
+  printf '%s\n' "${title}" > "${MOCK_STATE}/release-title"
+  printf '%s\n' "${prerelease}" > "${MOCK_STATE}/prerelease"
+  printf 'true\n' > "${MOCK_STATE}/draft"
+  : > "${MOCK_STATE}/assets"
+  rm -rf -- "${MOCK_STATE}/asset-files"
+  mkdir -p "${MOCK_STATE}/asset-files"
+  exit 0
+fi
+
+if [[ "$1" == "release" && "$2" == "upload" ]]; then
+  name="${4##*/}"
+  mkdir -p "${MOCK_STATE}/asset-files"
+  cp -- "$4" "${MOCK_STATE}/asset-files/${name}"
+  if ! grep -Fxq "${name}" "${MOCK_STATE}/assets"; then
+    printf '%s\n' "${name}" >> "${MOCK_STATE}/assets"
+  fi
+  exit 0
+fi
+
+if [[ "$1" == "release" && "$2" == "download" ]]; then
+  pattern=""
+  destination=""
+  while (( $# > 0 )); do
+    case "$1" in
+      --pattern)
+        pattern="$2"
+        shift 2
+        ;;
+      --dir)
+        destination="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  [[ -f "${MOCK_STATE}/asset-files/${pattern}" ]] || {
+    echo "asset not found" >&2
+    exit 1
+  }
+  mkdir -p "${destination}"
+  cp -- "${MOCK_STATE}/asset-files/${pattern}" "${destination}/${pattern}"
+  exit 0
+fi
+
+if [[ "$1" == "release" && "$2" == "edit" ]]; then
+  final_publish=false
+  shift 3
+  while (( $# > 0 )); do
+    case "$1" in
+      --title)
+        printf '%s\n' "$2" > "${MOCK_STATE}/release-title"
+        shift 2
+        ;;
+      --prerelease)
+        printf 'true\n' > "${MOCK_STATE}/prerelease"
+        shift
+        ;;
+      --prerelease=false)
+        printf 'false\n' > "${MOCK_STATE}/prerelease"
+        shift
+        ;;
+      --draft=false)
+        printf 'false\n' > "${MOCK_STATE}/draft"
+        final_publish=true
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ "${final_publish}" == "true" && "${MOCK_FAIL_FINAL_EDIT:-0}" == "1" ]]; then
+    echo "simulated lost final publish response" >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+if [[ "$1" == "release" && "$2" == "delete-asset" ]]; then
+  grep -Fxv "$4" "${MOCK_STATE}/assets" > "${MOCK_STATE}/assets.next" || true
+  mv "${MOCK_STATE}/assets.next" "${MOCK_STATE}/assets"
+  rm -f -- "${MOCK_STATE}/asset-files/$4"
+  exit 0
+fi
+
+if [[ "$1" == "api" ]]; then
+  if [[ "$2" == repos/*/git/ref/tags/dev ]]; then
+    if [[ -f "${MOCK_STATE}/tag" ]]; then
+      exit 0
+    fi
+    echo "tag not found (HTTP 404)" >&2
+    exit 1
+  fi
+
+  if [[ "$2" == "--method" && "$3" == "PATCH" ]]; then
+    if [[ "${MOCK_FAIL_PATCH:-0}" == "1" ]]; then
+      echo "simulated tag patch failure" >&2
+      exit 1
+    fi
+    sha=""
+    for argument in "$@"; do
+      [[ "${argument}" == sha=* ]] && sha="${argument#sha=}"
+    done
+    printf '%s\n' "${sha}" > "${MOCK_STATE}/tag"
+    exit 0
+  fi
+
+  if [[ "$2" == "--method" && "$3" == "POST" ]]; then
+    sha=""
+    for argument in "$@"; do
+      [[ "${argument}" == sha=* ]] && sha="${argument#sha=}"
+    done
+    printf '%s\n' "${sha}" > "${MOCK_STATE}/tag"
+    exit 0
+  fi
+fi
+
+echo "unexpected gh invocation: $*" >&2
+exit 70
