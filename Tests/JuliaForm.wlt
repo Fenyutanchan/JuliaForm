@@ -160,7 +160,11 @@ VerificationTest[
             }
         };
         texts = Association[
-            # -> If[FileExistsQ[#], Import[#, "Text"], $Failed] & /@
+            # -> If[
+                FileExistsQ[#],
+                Import[#, "Text", CharacterEncoding -> "UTF-8"],
+                $Failed
+            ] & /@
                 Flatten[pairs]
         ];
         headingLevels[text_String] := StringLength /@ Flatten[
@@ -219,7 +223,7 @@ VerificationTest[
             ] &&
             StringContainsQ[
                 texts[FileNameJoin[{root, "README_zh-CN.md"}]],
-                "规范英文文档"
+                FromCharacterCode[{35268, 33539, 33521, 25991, 25991, 26723}]
             ] &&
             StringContainsQ[
                 texts[FileNameJoin[{root, "CONTRIBUTING.md"}]],
@@ -227,7 +231,10 @@ VerificationTest[
             ] &&
             StringContainsQ[
                 texts[FileNameJoin[{root, "CONTRIBUTING_zh-CN.md"}]],
-                "首先编辑规范英文文件"
+                FromCharacterCode[
+                    {39318, 20808, 32534, 36753, 35268,
+                        33539, 33521, 25991, 25991, 20214}
+                ]
             ]
     ],
     True,
@@ -292,7 +299,8 @@ VerificationTest[
 
 VerificationTest[
     ToString[JuliaForm[{Pi, E, I, Infinity, -Infinity, Indeterminate}], OutputForm],
-    "[pi, ℯ, im, Inf, -Inf, NaN]",
+    "[pi, " <> FromCharacterCode[16^^212F] <>
+        ", im, Inf, -Inf, NaN]",
     TestID -> "constants"
 ]
 

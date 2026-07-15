@@ -1,5 +1,7 @@
 #!/usr/bin/env wolframscript
 
+$CharacterEncoding = "UTF-8";
+
 testDirectory = DirectoryName[$InputFileName];
 pacletDirectory = DirectoryName[testDirectory];
 

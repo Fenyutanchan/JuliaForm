@@ -1,5 +1,7 @@
 #!/usr/bin/env wolframscript
 
+$CharacterEncoding = "UTF-8";
+
 testDirectory = DirectoryName[ExpandFileName[$InputFileName]];
 pacletDirectory = DirectoryName[testDirectory];
 supportFile = FileNameJoin[{

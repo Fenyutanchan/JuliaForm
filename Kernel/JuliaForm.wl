@@ -234,7 +234,10 @@ emitHeld[HoldComplete[True]] := {"true", $precedenceAtom};
 emitHeld[HoldComplete[False]] := {"false", $precedenceAtom};
 emitHeld[HoldComplete[Null]] := {"nothing", $precedenceAtom};
 emitHeld[HoldComplete[Pi]] := {"pi", $precedenceAtom};
-emitHeld[HoldComplete[E]] := {"ℯ", $precedenceAtom};
+emitHeld[HoldComplete[E]] := {
+    FromCharacterCode[16^^212F],
+    $precedenceAtom
+};
 emitHeld[HoldComplete[EulerGamma]] :=
     {"Base.MathConstants.eulergamma", $precedenceAtom};
 emitHeld[HoldComplete[GoldenRatio]] :=
