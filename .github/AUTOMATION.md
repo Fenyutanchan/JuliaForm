@@ -39,19 +39,41 @@ Configure these repository Actions secrets before the first run:
 | `WOLFRAM_RUNTIME_IMAGE` | Complete Docker reference for the private Wolfram 15.0.0 image; prefer `namespace/repository@sha256:...` |
 | `DOCKERHUB_USERNAME` | Docker Hub account allowed to pull that image |
 | `DOCKERHUB_TOKEN` | Read-only Docker Hub access token for that account |
+| `REPOSITORY_SETTINGS_TOKEN` | Fine-grained personal access token limited to this repository, with repository `Administration: Read and write` and `Actions: Read` permissions |
 
 The image must provide a noninteractive Linux amd64 `wolframscript`, support
 execution as root, and preserve an entrypoint that installs its license or
 prepares its environment before forwarding the supplied command.
 
-Create the `dev` and `release` environments before enabling publication.
-Restrict `dev` deployments to `main` and `release` deployments to `v*.*.*`
-tags. Import `.github/rulesets/protect-main.json` and
-`.github/rulesets/protect-version-tags.json`, keep both active without bypass
-actors, and apply the payloads under `.github/repository-settings/`. The
-selected-actions policy permits GitHub-owned actions plus
+The default workflow `GITHUB_TOKEN` cannot administer repository settings.
+Create `REPOSITORY_SETTINGS_TOKEN` as a fine-grained token, grant access only
+to this repository, store it as an Actions secret, and rotate it before its
+expiry. A classic token with the broad `repo` scope also works, but is not the
+recommended credential.
+
+The `Repository settings` workflow runs when the checked-in settings, rulesets,
+sync script, validator, or workflow changes on `main`. It can also be dispatched
+manually from `main`; dispatches from any other ref are skipped so an untrusted
+revision cannot receive the administration token. The workflow first runs the
+fail-closed repository validator and then delegates to
+`.github/scripts/apply-repository-settings.sh`. That script uses the `gh` CLI
+preinstalled on GitHub-hosted runners and performs every write through
+`gh api`; it does not implement a separate HTTP client.
+
+The sync script applies Actions permissions and the selected-actions policy,
+creates or updates the `dev` and `release` environments, and makes their custom
+deployment policies exact: only `main` may deploy to `dev`, and only `v*.*.*`
+tags may deploy to `release`. Extra deployment policies are removed because
+they would widen the declared deployment boundary. The two checked-in rulesets
+are created or updated by their stable names; unrelated repository rulesets are
+left untouched. Repeated runs are idempotent.
+
+The selected-actions policy permits GitHub-owned actions plus
 `docker/login-action` and `julia-actions/setup-julia`; every workflow reference
-is still pinned to a full commit SHA.
+is still pinned to a full commit SHA. If a change introduces another external
+action, apply its allowlist change before relying on that action in a later
+commit, because GitHub evaluates the allowlist before any job in the dependent
+workflow can start.
 
 Repository secrets are unavailable to pull requests from forks. Their summary
 job fails explicitly until a maintainer retests the commit from a branch in the

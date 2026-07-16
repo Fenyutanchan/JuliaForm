@@ -1,0 +1,41 @@
+name: Repository settings
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/repository-settings/**'
+      - '.github/rulesets/**'
+      - '.github/scripts/apply-repository-settings.sh'
+      - '.github/scripts/validate-repository-config.rb'
+      - '.github/workflows/RepositorySettings.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-settings-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Apply repository settings
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository configuration
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate and apply repository configuration
+        shell: bash
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.REPOSITORY_SETTINGS_TOKEN }}
+        run: bash .github/scripts/apply-repository-settings.sh

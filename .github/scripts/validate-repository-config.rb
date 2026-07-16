@@ -253,6 +253,58 @@ assert(repository_config_block.include?("contents: read"),
 assert(!repository_config_block.include?("secrets."),
        "repository-config job must not read secrets")
 
+settings_workflow_path = File.join(ROOT, ".github/workflows/RepositorySettings.yml")
+assert(File.file?(settings_workflow_path),
+       "repository settings workflow is missing")
+settings_workflow = File.read(settings_workflow_path)
+
+required_settings_workflow_fragments = [
+  "name: Repository settings",
+  "branches:\n      - main",
+  "- '.github/repository-settings/**'",
+  "- '.github/rulesets/**'",
+  "- '.github/scripts/apply-repository-settings.sh'",
+  "- '.github/scripts/validate-repository-config.rb'",
+  "- '.github/workflows/RepositorySettings.yml'",
+  "workflow_dispatch:",
+  "permissions:\n  contents: read",
+  "cancel-in-progress: false",
+  "if: github.ref == 'refs/heads/main'",
+  "persist-credentials: false",
+  "GH_REPO: ${{ github.repository }}",
+  "GH_TOKEN: ${{ secrets.REPOSITORY_SETTINGS_TOKEN }}",
+  "bash .github/scripts/apply-repository-settings.sh"
+]
+required_settings_workflow_fragments.each do |fragment|
+  assert(settings_workflow.include?(fragment),
+         "repository settings workflow is missing a required policy fragment: #{fragment}")
+end
+assert(!settings_workflow.include?("pull_request:"),
+       "repository settings workflow must never run for pull requests")
+assert(!settings_workflow.include?("${{ github.token }}"),
+       "repository settings workflow must use the dedicated administration token")
+
+settings_apply_path = File.join(ROOT, ".github/scripts/apply-repository-settings.sh")
+assert(File.file?(settings_apply_path),
+       "repository settings apply script is missing")
+settings_apply = File.read(settings_apply_path)
+
+required_settings_apply_fragments = [
+  'readonly GITHUB_API_VERSION="2026-03-10"',
+  "ruby .github/scripts/validate-repository-config.rb",
+  '"repos/${GH_REPO}/actions/permissions"',
+  '"repos/${GH_REPO}/actions/permissions/selected-actions"',
+  '"repos/${GH_REPO}/environments/${environment_name}"',
+  "deployment-branch-policies?per_page=100",
+  "includes_parents=false&per_page=100",
+  'api --method POST "repos/${GH_REPO}/rulesets"',
+  'api --method PUT "repos/${GH_REPO}/rulesets/${ruleset_id}"'
+]
+required_settings_apply_fragments.each do |fragment|
+  assert(settings_apply.include?(fragment),
+         "repository settings apply script is missing a required policy fragment: #{fragment}")
+end
+
 assert(File.file?(File.join(ROOT, ".github/scripts/wolfram-runtime.sh")),
        "private Wolfram runtime helper is missing")
 
