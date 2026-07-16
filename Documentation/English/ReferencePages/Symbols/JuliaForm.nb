@@ -100,7 +100,9 @@ Cell[TextData[{
             BaseStyle -> "Link",
             ButtonData -> "paclet:ref/HoldForm"]
     ], "InlineFormula"],
-    " when its arithmetic structure must be retained."
+    " when its arithmetic structure must be retained. Ordinary quotients use ",
+    "readable Julia division. A held reciprocal that precedes later factors is ",
+    "left in place as inv(...) multiplication, without a private helper lambda."
 }], "Notes", CellID -> 1000017],
 
 Cell[TextData[{

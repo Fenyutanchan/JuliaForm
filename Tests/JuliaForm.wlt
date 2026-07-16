@@ -372,6 +372,18 @@ VerificationTest[
 ]
 
 VerificationTest[
+    ToString[JuliaForm[g[x]/f[x]], OutputForm],
+    "g(x) / f(x)",
+    TestID -> "canonical-factor-order-keeps-division-readable"
+]
+
+VerificationTest[
+    ToString[JuliaForm[Abs[g[x]/f[x]]^2], OutputForm],
+    "abs(g(x) / f(x)) ^ 2",
+    TestID -> "nested-quotient-avoids-factor-binding-lambda"
+]
+
+VerificationTest[
     ToString[
         JuliaForm[
             HoldForm[
@@ -380,10 +392,8 @@ VerificationTest[
         ],
         OutputForm
     ],
-    "((__jf_factor1, __jf_factor2, __jf_factor3) -> " <>
-        "__jf_factor1 * __jf_factor2 * __jf_factor3)(" <>
-        "u(), inv(v()), w())",
-    TestID -> "reciprocal-regrouping-preserves-factor-evaluation-order"
+    "u() * inv(v()) * w()",
+    TestID -> "held-reciprocals-preserve-factor-evaluation-order"
 ]
 
 VerificationTest[

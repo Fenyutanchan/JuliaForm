@@ -12,6 +12,7 @@ Needs["JuliaForm`"];
 syntaxExpressions = {
     HoldForm[a/(b + c)],
     HoldForm[(a + b)/c],
+    g[x]/f[x],
     HoldForm[a - (b + c)],
     HoldForm[(a + b)^c],
     HoldForm[x < y <= z],

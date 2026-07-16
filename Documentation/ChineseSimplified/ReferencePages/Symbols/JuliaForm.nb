@@ -100,7 +100,8 @@ Cell[TextData[{
             BaseStyle -> "Link",
             ButtonData -> "paclet:ref/HoldForm"]
     ], "InlineFormula"],
-    " 包裹该表达式。"
+    " 包裹该表达式。普通商式使用易读的 Julia 除法。若显式保留的倒数因子位于",
+    "后续因子之前，则用原位的 inv(...) 乘法保持该顺序，不生成私有 helper lambda。"
 }], "Notes", CellID -> 1000017],
 
 Cell[TextData[{

@@ -171,6 +171,22 @@ ToString[JuliaForm[HoldForm[a - (b + c)]], OutputForm]
 (* "a - (b + c)" *)
 ```
 
+Ordinary evaluated quotients are normalized to readable Julia division even
+when the canonical `FullForm` places a reciprocal factor before its numerator.
+An explicit `HoldForm` retains that factor order with `inv(...)` instead of an
+internal helper lambda:
+
+```wl
+ToString[JuliaForm[g[x]/f[x]], OutputForm]
+(* "g(x) / f(x)" *)
+
+ToString[
+    JuliaForm[HoldForm[Times[Power[f[x], -1], g[x]]]],
+    OutputForm
+]
+(* "inv(f(x)) * g(x)" *)
+```
+
 `HoldForm` preserves the structure of one expression; it does not turn
 `JuliaForm` into a general program serializer. Assignments, patterns, scoping,
 loops, and similar structures are rejected even inside `HoldForm`. Conversion

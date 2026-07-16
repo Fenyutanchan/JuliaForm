@@ -158,6 +158,21 @@ ToString[JuliaForm[HoldForm[a - (b + c)]], OutputForm]
 (* "a - (b + c)" *)
 ```
 
+普通的已求值商式会被整理成易读的 Julia 除法，即使其规范 `FullForm` 把倒数因子
+放在了分子之前。显式 `HoldForm` 则会用 `inv(...)` 保留该因子顺序，而不会生成
+内部 helper lambda：
+
+```wl
+ToString[JuliaForm[g[x]/f[x]], OutputForm]
+(* "g(x) / f(x)" *)
+
+ToString[
+    JuliaForm[HoldForm[Times[Power[f[x], -1], g[x]]]],
+    OutputForm
+]
+(* "inv(f(x)) * g(x)" *)
+```
+
 `HoldForm` 只用于保留单个表达式的结构，不会把 `JuliaForm` 变成通用程序
 序列化器。赋值、模式、作用域、循环等结构即使放在 `HoldForm` 中也会被拒绝。
 如果 `HoldForm` 保留了本应由 Wolfram Language 线程化的字面量列表调用，例如

@@ -297,7 +297,10 @@ emitHeld[HoldComplete[z_Complex]] := Module[{real, imaginary},
 emitHeld[HoldComplete[string_String]] :=
     {juliaString[string], $precedenceAtom};
 
-emitHeld[HoldComplete[HoldForm[inner_]]] := emitHeld[HoldComplete[inner]];
+emitHeld[HoldComplete[HoldForm[inner_]]] := Block[
+    {$preserveHeldFactorOrder = True},
+    emitHeld[HoldComplete[inner]]
+];
 
 emitHeld[HoldComplete[Plus[terms___]]] := Module[{items},
     items = heldItems[HoldComplete[terms]];
@@ -419,20 +422,12 @@ timesReordersEvaluationQ[items_List] := Module[{flags},
         MemberQ[Partition[flags, 2, 1], {True, False}]
 ];
 
-emitBoundTimesItems[items_List] := Module[
-    {names},
-    names = Table["__jf_factor" <> ToString[index], {index, Length[items]}];
-    {
-        "((" <> StringRiffle[names, ", "] <> ") -> " <>
-            StringRiffle[names, " * "] <> ")(" <>
-            StringRiffle[renderHeld /@ items, ", "] <> ")",
-        $precedenceCall
-    }
-];
-
 emitTimesItems[items_List] := Module[
     {numeratorItems, denominatorItems, numerator, denominator},
-    If[timesReordersEvaluationQ[items], Return[emitBoundTimesItems[items]]];
+    If[
+        TrueQ[$preserveHeldFactorOrder] && timesReordersEvaluationQ[items],
+        Return[emitProductItems[items]]
+    ];
     numeratorItems = Select[items, Not[reciprocalFactorQ[#]] &];
     denominatorItems = reciprocalBase /@
         Select[items, reciprocalFactorQ];
