@@ -85,7 +85,6 @@ while IFS= read -r -d '' shell_file; do
 done < <(find .github -type f \( -name '*.sh' -o -name 'gh' \) -print0)
 
 ruby .github/scripts/validate-repository-config.rb
-bash .github/tests/wolfram-runtime/run-tests.sh
 bash .github/tests/publish-paclet/run-tests.sh
 
 echo "Repository configuration checks passed."

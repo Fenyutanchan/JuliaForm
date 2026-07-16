@@ -4,7 +4,6 @@ set -Eeuo pipefail
 
 readonly container_name="${WOLFRAM_CONTAINER_NAME:-juliaform-wolfram-runtime}"
 readonly runner_temporary_directory="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
-readonly docker_config="${JULIAFORM_DOCKER_CONFIG:-${runner_temporary_directory}/juliaform-docker-auth}"
 readonly runtime_state_directory="${JULIAFORM_RUNTIME_STATE:-${runner_temporary_directory}/juliaform-wolfram-runtime}"
 readonly image_id_path="${runtime_state_directory}/image-id"
 
@@ -31,17 +30,10 @@ prepare_runtime() {
   require_no_arguments "$@"
   [[ -n "${runtime_image}" ]] ||
     fail "WOLFRAM_RUNTIME_IMAGE is empty"
-  [[ -n "${DOCKERHUB_USERNAME:-}" ]] ||
-    fail "DOCKERHUB_USERNAME is empty"
-  [[ -n "${DOCKERHUB_TOKEN:-}" ]] ||
-    fail "DOCKERHUB_TOKEN is empty"
 
-  mkdir -p -- "${docker_config}" "${runtime_state_directory}"
-  chmod 700 "${docker_config}" "${runtime_state_directory}"
-  export DOCKER_CONFIG="${docker_config}"
+  mkdir -p -- "${runtime_state_directory}"
+  chmod 700 "${runtime_state_directory}"
 
-  printf '%s' "${DOCKERHUB_TOKEN}" |
-    docker login --username "${DOCKERHUB_USERNAME}" --password-stdin >/dev/null
   docker pull --quiet "${runtime_image}" >/dev/null
   runtime_image_id="$(docker image inspect --format '{{.Id}}' "${runtime_image}")"
   [[ "${runtime_image_id}" =~ ^sha256:[0-9a-f]{64}$ ]] ||
@@ -73,10 +65,8 @@ run_in_runtime() {
 
 cleanup_runtime() {
   require_no_arguments "$@"
-  export DOCKER_CONFIG="${docker_config}"
 
   docker container rm --force "${container_name}" >/dev/null 2>&1 || true
-  docker logout >/dev/null 2>&1 || true
   rm -f -- "${image_id_path}"
 }
 

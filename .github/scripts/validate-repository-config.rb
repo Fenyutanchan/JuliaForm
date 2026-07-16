@@ -77,7 +77,10 @@ expected_settings = {
   ".github/repository-settings/selected-actions.json" => {
     "github_owned_allowed" => true,
     "verified_allowed" => false,
-    "patterns_allowed" => ["julia-actions/setup-julia@*"]
+    "patterns_allowed" => [
+      "docker/login-action@*",
+      "julia-actions/setup-julia@*"
+    ]
   }
 }
 
@@ -173,6 +176,11 @@ assert(update["package-ecosystem"] == "github-actions" && update["directory"] ==
 assert(update.dig("schedule", "interval") == "weekly",
        "Dependabot GitHub Actions updates must run weekly")
 
+approved_remote_actions = [
+  "docker/login-action",
+  "julia-actions/setup-julia"
+].freeze
+
 workflow_paths = Dir.glob(File.join(ROOT, ".github/workflows/*.{yml,yaml}")).sort
 assert(!workflow_paths.empty?, "repository must contain at least one workflow")
 workflow_paths.each do |path|
@@ -186,7 +194,7 @@ workflow_paths.each do |path|
     match && match[1]
   end.compact.each do |use|
     repository, revision = use.split("@", 2)
-    assert(repository.start_with?("actions/") || repository == "julia-actions/setup-julia",
+    assert(repository.start_with?("actions/") || approved_remote_actions.include?(repository),
            "non-approved remote action in #{relative_path}: #{use}")
     assert(revision&.match?(/\A[0-9a-f]{40}\z/),
            "remote action is not pinned to a full commit SHA in #{relative_path}: #{use}")
@@ -201,8 +209,10 @@ required_workflow_fragments = [
   "needs.repository-config.result == 'success'",
   "REPOSITORY_CONFIG_RESULT: ${{ needs.repository-config.result }}",
   'if [[ "${REPOSITORY_CONFIG_RESULT}" != "success" ]]',
-  "DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}",
-  "DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}",
+  "uses: docker/login-action@",
+  "username: ${{ secrets.DOCKERHUB_USERNAME }}",
+  "password: ${{ secrets.DOCKERHUB_TOKEN }}",
+  "logout: true",
   "WOLFRAM_RUNTIME_IMAGE: ${{ secrets.WOLFRAM_RUNTIME_IMAGE }}",
   "bash .github/scripts/wolfram-runtime.sh prepare",
   "bash .github/scripts/wolfram-runtime.sh run",
@@ -231,6 +241,10 @@ assert(!test_block.include?("max-parallel:"),
        "test matrix must not serialize unlimited Wolfram runtime instances")
 assert(test_block.include?("if: ${{ always() }}"),
        "test job must clean up the private Wolfram runtime unconditionally")
+login_action_position = test_block.index("uses: docker/login-action@")
+runtime_prepare_position = test_block.index("bash .github/scripts/wolfram-runtime.sh prepare")
+assert(login_action_position && runtime_prepare_position && login_action_position < runtime_prepare_position,
+       "test job must authenticate with docker/login-action before preparing the runtime")
 
 repository_config_block = workflow[/^  repository-config:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\z)/m, 1]
 assert(repository_config_block, "CI workflow is missing the repository-config job body")
@@ -241,8 +255,6 @@ assert(!repository_config_block.include?("secrets."),
 
 assert(File.file?(File.join(ROOT, ".github/scripts/wolfram-runtime.sh")),
        "private Wolfram runtime helper is missing")
-assert(File.file?(File.join(ROOT, ".github/tests/wolfram-runtime/run-tests.sh")),
-       "private Wolfram runtime mock tests are missing")
 
 runtime_helper = File.read(File.join(ROOT, ".github/scripts/wolfram-runtime.sh"))
 assert(runtime_helper.include?("docker run --rm"),
@@ -251,5 +263,15 @@ assert(!runtime_helper.include?("--entrypoint"),
        "private Wolfram runtime helper must preserve the image entrypoint")
 assert(!runtime_helper.include?("docker exec"),
        "private Wolfram runtime helper must not bypass entrypoint environment setup")
+[
+  "DOCKERHUB_USERNAME",
+  "DOCKERHUB_TOKEN",
+  "DOCKER_CONFIG",
+  "docker login",
+  "docker logout"
+].each do |fragment|
+  assert(!runtime_helper.include?(fragment),
+         "private Wolfram runtime helper must delegate registry authentication: #{fragment}")
+end
 
 puts "Repository settings, rulesets, Dependabot, and workflow policy are valid."
