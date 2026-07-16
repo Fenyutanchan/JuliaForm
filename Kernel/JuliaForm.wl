@@ -1538,6 +1538,9 @@ Format[JuliaForm[expr_], OutputForm] := Module[{code},
     If[StringQ[code], SequenceForm[code], $Failed]
 ];
 
+Format[JuliaForm[expr_], InputForm] :=
+    Format[JuliaForm[expr], OutputForm];
+
 JuliaForm /: MakeBoxes[
         JuliaForm[expr_],
         form : (StandardForm | TraditionalForm)

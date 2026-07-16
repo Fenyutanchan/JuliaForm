@@ -256,6 +256,31 @@ VerificationTest[
 ]
 
 VerificationTest[
+    ToString[JuliaForm[1 + Sin[x]/3], InputForm],
+    "1 + (1 // 3) * sin(x)",
+    TestID -> "input-form-renders-julia-source"
+]
+
+VerificationTest[
+    ExportString[JuliaForm[1 + Sin[x]/3], "Text"],
+    "1 + (1 // 3) * sin(x)",
+    TestID -> "text-export-string-renders-julia-source"
+]
+
+VerificationTest[
+    Module[{path = CreateTemporary[]},
+        WithCleanup[
+            Null,
+            Export[path, JuliaForm[1 + Sin[x]/3], "text"];
+            Import[path, "Text", CharacterEncoding -> "UTF-8"],
+            If[FileExistsQ[path], DeleteFile[path]]
+        ]
+    ],
+    "1 + (1 // 3) * sin(x)",
+    TestID -> "text-file-export-renders-julia-source"
+]
+
+VerificationTest[
     ToString[JuliaForm[42], OutputForm],
     "42",
     TestID -> "integer"

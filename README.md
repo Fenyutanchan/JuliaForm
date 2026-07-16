@@ -106,6 +106,13 @@ ToString[a/(b + c), JuliaForm]
 (* "a / (b + c)" *)
 ```
 
+Text export consumes the wrapper through `InputForm`, so it can write Julia
+source directly without an intermediate `ToString` call:
+
+```wl
+Export["expression.jl", JuliaForm[a/(b + c)], "Text"]
+```
+
 Matrices and associations produce native Julia constructs:
 
 ```wl
@@ -121,14 +128,18 @@ ToString[JuliaForm[<|"x" -> 1, "y" -> {2, 3}|>], OutputForm]
 | Call | Result |
 |---|---|
 | `JuliaForm[expr]` | Stores an output-form wrapper and displays `expr` as a Julia expression |
+| `ToString[JuliaForm[expr], InputForm]` | Returns the Julia source string used by text exporters |
 | `ToString[JuliaForm[expr], OutputForm]` | Returns the Julia source string |
 | `ToString[expr, JuliaForm]` | Returns the same source string as a compatibility form |
+| `Export[path, JuliaForm[expr], "Text"]` | Writes the Julia source directly to `path` |
 
 `JuliaForm` accepts exactly one argument and has no options. Output is fixed as
 deterministic, single-line UTF-8 text, so the compatibility form
 `ToString[expr, JuliaForm]` does not implement the page width, character
 encoding, or other options of `ToString`. For an unsupported construct, the
-function emits `JuliaForm::unsupported` and returns `$Failed`.
+function emits `JuliaForm::unsupported` and returns `$Failed`. Both `InputForm`
+and `OutputForm` render Julia source; `FullForm` still reveals the stored
+`JuliaForm[expr]` wrapper.
 
 Top-level `JuliaForm[expr]` is registered in `$OutputForms`, so its interactive
 display form is not stored in `Out`. An explicit assignment still stores the
@@ -140,8 +151,8 @@ Head[rendered]
 (* JuliaForm *)
 ```
 
-If downstream code needs only text, call `ToString` immediately at that
-boundary.
+If downstream code requires an actual `String` value, call `ToString` at that
+boundary. Text export can consume the wrapper directly.
 
 ## Evaluation and `HoldForm`
 

@@ -98,6 +98,13 @@ ToString[a/(b + c), JuliaForm]
 (* "a / (b + c)" *)
 ```
 
+文本导出通过 `InputForm` 使用该 wrapper，因此无需先调用 `ToString` 就能直接
+写入 Julia 源码：
+
+```wl
+Export["expression.jl", JuliaForm[a/(b + c)], "Text"]
+```
+
 矩阵和关联会生成 Julia 原生构造：
 
 ```wl
@@ -113,13 +120,16 @@ ToString[JuliaForm[<|"x" -> 1, "y" -> {2, 3}|>], OutputForm]
 | 调用 | 结果 |
 |---|---|
 | `JuliaForm[expr]` | 保存一个输出 Form wrapper，并把 `expr` 显示为 Julia 表达式 |
+| `ToString[JuliaForm[expr], InputForm]` | 返回文本导出器使用的 Julia 源码字符串 |
 | `ToString[JuliaForm[expr], OutputForm]` | 返回 Julia 源码字符串 |
 | `ToString[expr, JuliaForm]` | 返回相同的源码字符串，作为兼容写法 |
+| `Export[path, JuliaForm[expr], "Text"]` | 把 Julia 源码直接写入 `path` |
 
 `JuliaForm` 恰好接受一个参数，没有选项。生成结果固定为确定性的单行 UTF-8
 文本，因此兼容形式 `ToString[expr, JuliaForm]` 不实现 `ToString` 的分页、字符
 编码或其他选项。遇到不支持的结构时，函数发送 `JuliaForm::unsupported` 并返回
-`$Failed`。
+`$Failed`。`InputForm` 与 `OutputForm` 都会渲染 Julia 源码；`FullForm` 仍会显示
+存储的 `JuliaForm[expr]` wrapper。
 
 顶层 `JuliaForm[expr]` 已注册到 `$OutputForms`，所以交互式显示形式不会存入
 `Out`。但是显式赋值仍会保存 wrapper，这一点与 `CForm` 相同：
@@ -130,7 +140,8 @@ Head[rendered]
 (* JuliaForm *)
 ```
 
-若后续代码只需要文本，应在边界处立即调用 `ToString`。
+若后续代码要求实际的 `String` 值，应在该边界调用 `ToString`。文本导出可以直接
+使用 wrapper。
 
 ## 求值与 `HoldForm`
 

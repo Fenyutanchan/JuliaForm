@@ -106,7 +106,14 @@ Cell[TextData[{
 Cell[TextData[{
     "输出是确定性的单行 UTF-8 源码。",
     Cell[BoxData["JuliaForm"], "InlineFormula"],
-    " 只接受一个参数，并且没有选项。"
+    " 只接受一个参数，并且没有选项。",
+    Cell[BoxData["InputForm"], "InlineFormula"],
+    " 与 ",
+    Cell[BoxData["OutputForm"], "InlineFormula"],
+    " 都会渲染该源码，因此把 wrapper 导出为文本时会写入 Julia 语法，",
+    "而不是字面的 ",
+    Cell[BoxData["JuliaForm"], "InlineFormula"],
+    " 表达式。"
 }], "Notes", CellID -> 1000018],
 
 Cell[TextData[{

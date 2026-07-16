@@ -106,7 +106,14 @@ Cell[TextData[{
 Cell[TextData[{
     "Output is deterministic, single-line UTF-8 source. ",
     Cell[BoxData["JuliaForm"], "InlineFormula"],
-    " accepts exactly one argument and has no options."
+    " accepts exactly one argument and has no options. Both ",
+    Cell[BoxData["InputForm"], "InlineFormula"],
+    " and ",
+    Cell[BoxData["OutputForm"], "InlineFormula"],
+    " render this source, so exporting the wrapper as text writes Julia syntax ",
+    "rather than a literal ",
+    Cell[BoxData["JuliaForm"], "InlineFormula"],
+    " expression."
 }], "Notes", CellID -> 1000018],
 
 Cell[TextData[{
