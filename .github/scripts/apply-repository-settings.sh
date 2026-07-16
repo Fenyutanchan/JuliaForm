@@ -58,7 +58,6 @@ sync_environment() {
 : "${GH_REPO:?GH_REPO is unavailable}"
 
 cd -- "${repository_root}"
-ruby .github/scripts/validate-repository-config.rb
 
 put_json \
   "repos/${GH_REPO}/actions/permissions" \

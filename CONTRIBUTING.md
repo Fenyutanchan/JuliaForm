@@ -136,14 +136,13 @@ registration so an earlier directory load does not hide a lifecycle bug.
 | `Scripts/PacletBuildSupport.wl` | Builds both documentation languages and enforces artifact integrity |
 | `.github/workflows/CI.yml` | Tests, builds, and orchestrates dev and stable publication |
 | `.github/AUTOMATION.md` | Documents the checked-in repository automation contract |
-| `.github/scripts/check-repository-config.sh` | Runs the local and CI repository-configuration gate |
-| `.github/scripts/validate-repository-config.rb` | Validates settings, rulesets, Dependabot, and workflow policy |
-| `.github/scripts/publish-paclet.sh` | Implements GitHub Release publication |
-| `.github/tests/publish-paclet/` | Exercises release publication and interruption recovery with a local `gh` mock |
+| `.github/scripts/apply-repository-settings.sh` | Applies the checked-in settings and rulesets through `gh api` |
+| `.github/scripts/wolfram-runtime.sh` | Runs Wolfram commands in the private CI image |
+| `.github/scripts/publish-paclet.sh` | Publishes rolling and stable GitHub Releases |
 | `.github/dependabot.yml` | Maintains immutable GitHub Action pins |
 | `.github/repository-settings/*.json` | Reproducible Actions and environment API payloads |
-| `.github/rulesets/protect-main.json` | Importable main-branch history protection |
-| `.github/rulesets/protect-version-tags.json` | Importable protection for stable version tags |
+| `.github/rulesets/protect-main.json` | Applied main-branch history protection |
+| `.github/rulesets/protect-version-tags.json` | Applied protection for stable version tags |
 | `dist/` | Local `.paclet` build artifacts; not source |
 
 The package uses Wolfram 15.0 Structured Package Format. Declare public
@@ -183,23 +182,14 @@ previously generated file by accepting that path as its only argument.
 Run both commands before opening a pull request or pushing directly to `main`.
 The checked-in GitHub Actions workflow repeats both paths with Wolfram Engine
 15.0.0 across Julia's `lts` and `latest` channels for pushes to `main`,
-same-repository pull requests, merge-queue groups, strict version tags, and
-manual runs. The `latest` channel uses setup-julia's `'1'` selector for the
-latest stable Julia 1.x release. Wolfram commands run in the private, fully
-licensed runtime managed by `.github/scripts/wolfram-runtime.sh`. Its unlimited
-instance concurrency allows the two Julia matrix legs to run simultaneously on
-independent runners. Fork pull requests cannot receive its image and Docker Hub
-secrets, so their `CI summary` fails explicitly until a maintainer retests the
-commit from a branch in the base repository.
-
-The secret-free `Repository config` job is also a required prerequisite. It
-pins actionlint by version and archive SHA-256, checks every workflow shell
-script, validates the checked-in settings and rulesets exactly, and runs the
-release publisher's local mock suite. Run the same gate on Linux amd64 with:
-
-```bash
-bash .github/scripts/check-repository-config.sh
-```
+same-repository pull requests, strict version tags, and manual runs. The
+`latest` channel uses setup-julia's `'1'` selector for the latest stable Julia
+1.x release. Wolfram commands run in the private, fully licensed runtime
+managed by `.github/scripts/wolfram-runtime.sh`. Its unlimited instance
+concurrency allows the two Julia matrix legs to run simultaneously on
+independent runners. Fork pull requests cannot receive the image and Docker
+Hub secrets, so the secret-dependent test job is skipped until a maintainer
+retests the commit from a branch in this repository.
 
 When changing behavior:
 
@@ -285,22 +275,21 @@ wolframscript -file Tests/ValidatePacletArtifact.wls
 Every successful CI test run uploads the archive as a short-lived workflow
 artifact. A push to `main` additionally sends that tested artifact through the
 GitHub `dev` environment and updates the rolling prerelease at tag `dev`. The
-publisher uploads a commit-unique asset, downloads it to verify SHA-256, moves
-the tag only after that check, and removes stale assets last, so an interrupted
-run is recoverable. The publish jobs are the only jobs with release write
-permissions; pull requests, merge-queue groups, and manual runs never publish.
-Restrict `dev` to `main` and `release` to `v*.*.*` tags in their environment
-deployment policies.
+publisher replaces the disposable release and tag with the canonical archive
+from the tested commit; the next successful `main` run recreates them after an
+interrupted publication. The publish jobs are the only jobs with release write
+permissions; pull requests and manual runs never publish. The checked-in
+repository settings restrict `dev` deployments to `main` and `release`
+deployments to `v*.*.*` tags.
 
-Import `.github/rulesets/protect-main.json` and
-`.github/rulesets/protect-version-tags.json` from repository `Settings` →
-`Rules` → `Rulesets`. Keep both active without bypass actors. The main rule
-allows direct fast-forward pushes while blocking branch deletion and history
-rewrites. CI validates each accepted main-branch commit before the dev
-publisher can update the rolling prerelease. The tag rule allows new `v*` tags
-but blocks every update and deletion after creation, while leaving the rolling
-`dev` tag mutable. Do not enable repository-wide release immutability, because
-that setting would also lock the dev prerelease.
+The `Repository settings` workflow automatically applies the checked-in
+Actions policy, environments, and rulesets after matching changes reach
+`main`. Keep both rulesets active without bypass actors. The main rule allows
+direct fast-forward pushes while blocking branch deletion and history
+rewrites. The tag rule allows new `v*` tags but blocks every update and deletion
+after creation, while leaving the rolling `dev` tag mutable. Do not enable
+repository-wide release immutability, because that setting would also lock the
+dev prerelease.
 
 The rolling `dev` prerelease is not a stable versioned release. To cut a stable
 release:
@@ -321,13 +310,12 @@ release:
    ```
 
 After both Julia matrix legs pass, CI creates the stable GitHub Release and
-attaches the tested archive, downloads it again to verify SHA-256, and only then
-publishes it. The tag and Paclet versions must match exactly. CI may resume a
-byte-identical draft but refuses a mismatched same-name asset or any change to
-an already published stable Release. If a final publish response was lost, a
-rerun may succeed read-only only after the canonical metadata, sole asset, and
-remote SHA-256 all match. Never move, delete, or reuse a published version tag;
-release a new patch version when a correction is required.
+attaches the tested canonical archive. The existing tag, Paclet version, and
+archive filename must match exactly. An already published stable Release is
+never rewritten. If an interrupted run leaves an incomplete draft, delete only
+that draft and rerun the tag workflow while preserving the tag. Never move,
+delete, or reuse a published version tag; release a new patch version when a
+correction is required.
 
 ## Commit Message Convention
 

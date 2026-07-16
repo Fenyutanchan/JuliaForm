@@ -8,7 +8,6 @@ on:
       - '.github/repository-settings/**'
       - '.github/rulesets/**'
       - '.github/scripts/apply-repository-settings.sh'
-      - '.github/scripts/validate-repository-config.rb'
       - '.github/workflows/RepositorySettings.yml'
   workflow_dispatch:
 
@@ -30,10 +29,9 @@ jobs:
       - name: Check out repository configuration
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 1
           persist-credentials: false
 
-      - name: Validate and apply repository configuration
+      - name: Apply repository configuration
         shell: bash
         env:
           GH_REPO: ${{ github.repository }}

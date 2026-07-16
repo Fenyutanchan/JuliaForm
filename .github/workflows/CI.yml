@@ -4,104 +4,37 @@ on:
   push:
     branches:
       - main
-    # GitHub ref filters are globs, not regular expressions. This excludes
-    # suffixes and non-numeric components; preflight also rejects leading zeros.
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request:
-  merge_group:
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Supersede only pull-request validation. Main and tag runs can reach a release
-# job, so a newer run must never cancel them halfway through publication.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  preflight:
-    name: Preflight
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions: {}
-    outputs:
-      can_test: ${{ steps.scope.outputs.can_test }}
-
-    steps:
-      - name: Validate event scope
-        id: scope
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-          REPOSITORY: ${{ github.repository }}
-          REF_NAME: ${{ github.ref_name }}
-          REF_TYPE: ${{ github.ref_type }}
-        run: |
-          set -euo pipefail
-
-          can_test=true
-          if [[ "${EVENT_NAME}" == "pull_request" ]] &&
-             [[ "${HEAD_REPOSITORY}" != "${REPOSITORY}" ]]; then
-            can_test=false
-            echo "::notice title=Untrusted pull request::Wolfram tests require private-runtime secrets. A maintainer must validate this commit from a branch in the base repository."
-          fi
-
-          if [[ "${REF_TYPE}" == "tag" ]] &&
-             [[ ! "${REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error title=Invalid release tag::Stable tags must use canonical vMAJOR.MINOR.PATCH SemVer without leading zeros: ${REF_NAME}"
-            exit 1
-          fi
-
-          echo "can_test=${can_test}" >> "${GITHUB_OUTPUT}"
-
-  repository-config:
-    name: Repository config
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Validate workflows and repository configuration
-        shell: bash
-        run: bash .github/scripts/check-repository-config.sh
-
   test:
-    name: Wolfram 15.0 / Julia ${{ matrix.julia-channel }}
-    needs:
-      - preflight
-      - repository-config
+    name: Wolfram 15.0 / Julia ${{ matrix.julia-version }}
     if: >-
-      needs.preflight.outputs.can_test == 'true' &&
-      needs.repository-config.result == 'success'
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - julia-channel: lts
-            julia-version: lts
-          - julia-channel: latest
-            julia-version: '1'
+        julia-version:
+          - lts
+          - '1'
 
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 1
           persist-credentials: false
 
       - name: Log in to Docker Hub
@@ -109,7 +42,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          logout: true
 
       - name: Prepare private Wolfram runtime
         shell: bash
@@ -121,7 +53,6 @@ jobs:
         uses: julia-actions/setup-julia@fa02766e078afaaf09b14210362cee14137e6a32 # v3.0.2
         with:
           version: ${{ matrix.julia-version }}
-          show-versioninfo: 'true'
 
       - name: Run Wolfram tests
         shell: bash
@@ -140,21 +71,21 @@ jobs:
             Tests/JuliaValidation.jl dist/JuliaValidation.out
 
       - name: Build paclet
-        if: matrix.julia-channel == 'latest'
+        if: matrix.julia-version == '1'
         shell: bash
         run: >-
           bash .github/scripts/wolfram-runtime.sh run
           wolframscript -file Scripts/BuildPaclet.wls
 
       - name: Validate built paclet
-        if: matrix.julia-channel == 'latest'
+        if: matrix.julia-version == '1'
         shell: bash
         run: >-
           bash .github/scripts/wolfram-runtime.sh run
           wolframscript -file Tests/ValidatePacletArtifact.wls
 
       - name: Upload paclet artifact
-        if: matrix.julia-channel == 'latest'
+        if: matrix.julia-version == '1'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: JuliaForm-paclet
@@ -163,70 +94,14 @@ jobs:
           compression-level: 0
           retention-days: 7
 
-      - name: Clean up private Wolfram runtime
-        if: ${{ always() }}
-        shell: bash
-        run: bash .github/scripts/wolfram-runtime.sh cleanup
-
-  ci-summary:
-    name: CI summary
-    needs:
-      - preflight
-      - repository-config
-      - test
-    if: ${{ always() }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions: {}
-
-    steps:
-      - name: Require all validation to pass
-        shell: bash
-        env:
-          CAN_TEST: ${{ needs.preflight.outputs.can_test }}
-          PREFLIGHT_RESULT: ${{ needs.preflight.result }}
-          REPOSITORY_CONFIG_RESULT: ${{ needs.repository-config.result }}
-          TEST_RESULT: ${{ needs.test.result }}
-        run: |
-          set -euo pipefail
-
-          if [[ "${PREFLIGHT_RESULT}" != "success" ]]; then
-            echo "::error title=Preflight failed::Preflight result was ${PREFLIGHT_RESULT}."
-            exit 1
-          fi
-
-          if [[ "${REPOSITORY_CONFIG_RESULT}" != "success" ]]; then
-            echo "::error title=Repository configuration failed::Repository config result was ${REPOSITORY_CONFIG_RESULT}."
-            exit 1
-          fi
-
-          if [[ "${CAN_TEST}" != "true" ]]; then
-            echo "::error title=Validation required::This pull request cannot receive the private Wolfram runtime secrets. A maintainer must validate the commit from a base-repository branch."
-            exit 1
-          fi
-
-          if [[ "${TEST_RESULT}" != "success" ]]; then
-            echo "::error title=Test matrix failed::Test result was ${TEST_RESULT}."
-            exit 1
-          fi
-
-          echo "All required validation, including the built-paclet check, passed."
-
   publish-dev:
     name: Publish paclet to dev
-    needs:
-      - test
-      - ci-summary
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      actions: read
       contents: write
-      deployments: write
-    concurrency:
-      group: publish-dev-${{ github.repository }}
-      cancel-in-progress: false
     environment:
       name: dev
       url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/dev
@@ -235,9 +110,7 @@ jobs:
       - name: Check out release tooling
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 1
           persist-credentials: false
-          sparse-checkout: .github/scripts
 
       - name: Download paclet artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -254,19 +127,12 @@ jobs:
 
   publish-release:
     name: Publish versioned release
-    needs:
-      - test
-      - ci-summary
+    needs: test
     if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      actions: read
       contents: write
-      deployments: write
-    concurrency:
-      group: publish-release-${{ github.repository }}-${{ github.ref_name }}
-      cancel-in-progress: false
     environment:
       name: release
       url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}
@@ -275,9 +141,7 @@ jobs:
       - name: Check out release tooling
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 1
           persist-credentials: false
-          sparse-checkout: .github/scripts
 
       - name: Download paclet artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

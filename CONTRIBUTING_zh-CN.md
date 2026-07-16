@@ -120,14 +120,13 @@ Needs["JuliaForm`"];
 | `Scripts/PacletBuildSupport.wl` | 构建两种文档语言并执行产物完整性门禁 |
 | `.github/workflows/CI.yml` | 测试、构建并编排 dev 与稳定版本发布 |
 | `.github/AUTOMATION.md` | 说明仓库中受版本控制的自动化契约 |
-| `.github/scripts/check-repository-config.sh` | 运行本地与 CI 仓库配置门禁 |
-| `.github/scripts/validate-repository-config.rb` | 验证 settings、rulesets、Dependabot 与工作流策略 |
-| `.github/scripts/publish-paclet.sh` | 实现 GitHub Release 发布 |
-| `.github/tests/publish-paclet/` | 使用本地 `gh` mock 测试发布与中断恢复 |
+| `.github/scripts/apply-repository-settings.sh` | 通过 `gh api` 应用受版本控制的 settings 与 rulesets |
+| `.github/scripts/wolfram-runtime.sh` | 在私有 CI 镜像中运行 Wolfram 命令 |
+| `.github/scripts/publish-paclet.sh` | 发布滚动与稳定 GitHub Release |
 | `.github/dependabot.yml` | 维护不可变的 GitHub Action pin |
 | `.github/repository-settings/*.json` | 可复用的 Actions 与 environment API payload |
-| `.github/rulesets/protect-main.json` | 可导入的 main 分支历史保护 |
-| `.github/rulesets/protect-version-tags.json` | 可导入的稳定版本 tag 保护规则 |
+| `.github/rulesets/protect-main.json` | 已应用的 main 分支历史保护 |
+| `.github/rulesets/protect-version-tags.json` | 已应用的稳定版本 tag 保护规则 |
 | `dist/` | 本地 `.paclet` 构建产物；不是源文件 |
 
 本 package 使用 Wolfram 15.0 Structured Package Format。通过
@@ -160,22 +159,14 @@ Wolfram 脚本把渲染器的真实输出写入标准输出。Julia 驱动程序
 文件读取数据。
 
 提交 pull request 或直接向 `main` push 前，请运行这两条命令。仓库中的
-GitHub Actions 工作流会在向 `main` push、同仓库 pull request、merge queue
-group、严格版本 tag 和手动运行时，使用 Wolfram Engine 15.0.0，在
-Julia 的 `lts` 与 `latest` 通道上重复这两条路径。`latest` 通道使用
-setup-julia 的 `'1'` 选择器，即最新稳定的 Julia 1.x。Wolfram 命令在
-`.github/scripts/wolfram-runtime.sh` 管理的私有、完整授权运行时中执行。该运行时
-支持无限实例并发，因此两个 Julia 矩阵项可以在各自独立的 runner 上同时运行。
-fork pull request 无法获得镜像与 Docker Hub secrets，因此其 `CI summary` 会
-明确失败，直到维护者从同仓库分支复测该 commit。
-
-不读取 secret 的 `Repository config` 作业也是必需前置门禁。它按版本和归档
-SHA-256 固定 actionlint，检查每个工作流 shell 脚本，精确验证受版本控制的
-settings 与 rulesets，并运行发布器的本地 mock 套件。在 Linux amd64 上可运行：
-
-```bash
-bash .github/scripts/check-repository-config.sh
-```
+GitHub Actions 工作流会在向 `main` push、同仓库 pull request、严格版本 tag
+和手动运行时，使用 Wolfram Engine 15.0.0，在 Julia 的 `lts` 与 `latest`
+通道上重复这两条路径。`latest` 通道使用 setup-julia 的 `'1'` 选择器，即最新
+稳定的 Julia 1.x。Wolfram 命令在 `.github/scripts/wolfram-runtime.sh` 管理的
+私有、完整授权运行时中执行。该运行时支持无限实例并发，因此两个 Julia 矩阵项
+可以在各自独立的 runner 上同时运行。fork pull request 无法获得镜像与 Docker
+Hub secrets，因此依赖 secret 的测试作业会被跳过，直到维护者从本仓库分支复测
+该 commit。
 
 变更行为时：
 
@@ -245,20 +236,17 @@ wolframscript -file Tests/ValidatePacletArtifact.wls
 
 每次成功的 CI 测试运行都会把归档上传为短期 workflow artifact。向 `main`
 push 还会通过 GitHub `dev` environment 传递已测试的 artifact，并更新 `dev`
-tag 对应的滚动预发布版本。发布器先上传 commit 唯一的资产，重新下载并验证
-SHA-256，通过后才移动 tag，最后删除陈旧资产，因此中断后可恢复。只有发布作业
-具有 release 写权限；pull request、merge queue group 和手动运行永远不会发布。
-environment 部署策略应把 `dev` 限制到 `main`，把 `release` 限制到 `v*.*.*`
-tag。
+tag 对应的滚动预发布版本。发布器使用已测试 commit 的规范归档替换可丢弃的
+release 与 tag；若发布中断，下一个成功的 `main` 运行会重新创建它们。只有发布
+作业具有 release 写权限；pull request 和手动运行永远不会发布。受版本控制的
+仓库设置把 `dev` 部署限制到 `main`，把 `release` 部署限制到 `v*.*.*` tag。
 
-应从仓库 `Settings` → `Rules` → `Rulesets` 导入
-`.github/rulesets/protect-main.json` 和
-`.github/rulesets/protect-version-tags.json`。保持两者 active 且不配置 bypass
-actor。main 规则允许直接快进 push，同时阻止删除分支和改写历史。CI 会验证
-每个已经进入 main 的 commit，只有通过后 dev 发布器才会更新滚动预发布版本。
-tag 规则允许创建新的 `v*` tag，但会阻止创建后的任何更新与删除，同时让滚动
-`dev` tag 保持可变。不要启用仓库级 release immutability，因为该设置也会锁定
-dev prerelease。
+匹配的变更进入 `main` 后，`Repository settings` 工作流会自动应用受版本控制的
+Actions 策略、environments 与 rulesets。保持两个 ruleset active 且不配置
+bypass actor。main 规则允许直接快进 push，同时阻止删除分支和改写历史。tag
+规则允许创建新的 `v*` tag，但会阻止创建后的任何更新与删除，同时让滚动 `dev`
+tag 保持可变。不要启用仓库级 release immutability，因为该设置也会锁定 dev
+prerelease。
 
 滚动 `dev` 预发布版本不是稳定的版本化 release。要发布稳定版本：
 
@@ -275,11 +263,10 @@ dev prerelease。
    ```
 
 两个 Julia 矩阵项都通过后，CI 会创建稳定的 GitHub Release，并附加经过测试的
-归档、重新下载验证 SHA-256，最后才发布。tag 版本与 Paclet 版本必须完全一致。
-CI 可以恢复字节一致的 draft，但拒绝同名而内容不同的资产，也拒绝修改已经发布
-的稳定 Release。如果最终发布响应丢失，重跑只有在规范 metadata、唯一资产及
-远端 SHA-256 全部一致时，才会以只读方式成功。不得移动、删除或复用已发布的
-版本 tag；需要修正时应发布新的补丁版本。
+规范归档。现有 tag、Paclet 版本与归档文件名必须完全一致。已经发布的稳定
+Release 永远不会被改写。如果中断的运行留下未完成的 draft，只删除该 draft，
+在保留 tag 的前提下重新运行 tag 工作流。不得移动、删除或复用已发布的版本
+tag；需要修正时应发布新的补丁版本。
 
 ## 提交消息规范
 

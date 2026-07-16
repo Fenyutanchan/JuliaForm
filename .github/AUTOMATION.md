@@ -4,31 +4,21 @@
 > Keep this document named `AUTOMATION.md`. A `README` file in `.github/`
 > takes precedence over the project-level `README.md` on the repository page.
 
-## Validation
-
-The `Repository config` CI job runs
-`.github/scripts/check-repository-config.sh`. It pins actionlint 1.7.12 to the
-SHA-256 published with its official release, checks every workflow shell
-script, validates Dependabot and the checked-in repository policy JSON, and
-runs the release publisher against the local `gh` mock.
-
 ## Private Wolfram runtime
 
-The test matrix delegates Docker Hub authentication to Docker's official
-`docker/login-action`, pinned to a full commit SHA and configured to log out in
-its post-job hook. `.github/scripts/wolfram-runtime.sh` then pulls the private
-runtime named by `WOLFRAM_RUNTIME_IMAGE` without reading registry credentials
-and retains only its local image ID. Every Wolfram command runs in a fresh
-root-owned `docker run --rm` container with the checkout mounted at
-`/workspace`. The image's native entrypoint is preserved for license
-installation and environment initialization, and the first one-shot container
-must report Wolfram 15.0.0. The runtime permits unlimited concurrent instances,
-so the Julia matrix has no `max-parallel` throttle and its independent runner
-jobs may execute together. The workflow always removes any interrupted
-container and deletes its local runtime state; it never reads the legacy
-on-demand entitlement secret. The repository-config gate checks the
-authentication boundary statically; registry login and the runtime lifecycle
-are exercised directly by the test jobs in GitHub Actions.
+The CI matrix uses Docker's official `docker/login-action`, pinned to a full
+commit SHA, to authenticate to Docker Hub. Its default post-job hook logs out.
+`.github/scripts/wolfram-runtime.sh` pulls the private image named by
+`WOLFRAM_RUNTIME_IMAGE`, tags it with a local non-secret alias, and verifies
+that its first one-shot container reports Wolfram 15.0.0.
+
+Every Wolfram command runs as root in a fresh `docker run --rm` container with
+the checkout mounted at `/workspace`. The image's native entrypoint is
+preserved so it can install the license or initialize its environment before
+forwarding the command. The runtime supports unlimited concurrent instances,
+so the two Julia matrix jobs may run at the same time. Secret-dependent tests
+are skipped for pull requests from forks; a maintainer must retest such a
+change from a branch in this repository.
 
 ## Required repository configuration
 
@@ -42,66 +32,40 @@ Configure these repository Actions secrets before the first run:
 | `REPOSITORY_SETTINGS_TOKEN` | Fine-grained personal access token limited to this repository, with repository `Administration: Read and write` and `Actions: Read` permissions |
 
 The image must provide a noninteractive Linux amd64 `wolframscript`, support
-execution as root, and preserve an entrypoint that installs its license or
-prepares its environment before forwarding the supplied command.
+execution as root, and preserve an entrypoint that prepares its license and
+environment before forwarding the supplied command.
 
 The default workflow `GITHUB_TOKEN` cannot administer repository settings.
-Create `REPOSITORY_SETTINGS_TOKEN` as a fine-grained token, grant access only
-to this repository, store it as an Actions secret, and rotate it before its
-expiry. A classic token with the broad `repo` scope also works, but is not the
-recommended credential.
+Use a fine-grained `REPOSITORY_SETTINGS_TOKEN` restricted to this repository
+and rotate it before expiry.
 
-The `Repository settings` workflow runs when the checked-in settings, rulesets,
-sync script, validator, or workflow changes on `main`. It can also be dispatched
-manually from `main`; dispatches from any other ref are skipped so an untrusted
-revision cannot receive the administration token. The workflow first runs the
-fail-closed repository validator and then delegates to
-`.github/scripts/apply-repository-settings.sh`. That script uses the `gh` CLI
-preinstalled on GitHub-hosted runners and performs every write through
-`gh api`; it does not implement a separate HTTP client.
-
-The sync script applies Actions permissions and the selected-actions policy,
-creates or updates the `dev` and `release` environments, and makes their custom
-deployment policies exact: only `main` may deploy to `dev`, and only `v*.*.*`
-tags may deploy to `release`. Extra deployment policies are removed because
-they would widen the declared deployment boundary. The two checked-in rulesets
-are created or updated by their stable names; unrelated repository rulesets are
-left untouched. Repeated runs are idempotent.
+The `Repository settings` workflow runs on `main` when its workflow, sync
+script, settings payloads, or rulesets change. It may also be dispatched
+manually from `main`. `.github/scripts/apply-repository-settings.sh` uses the
+runner's `gh` CLI to apply Actions permissions, the selected-actions allowlist,
+the `dev` and `release` environments, and both named rulesets. Environment
+deployment policies are made exact; unrelated rulesets are left untouched.
+Repeated runs are idempotent.
 
 The selected-actions policy permits GitHub-owned actions plus
-`docker/login-action` and `julia-actions/setup-julia`; every workflow reference
-is still pinned to a full commit SHA. If a change introduces another external
-action, apply its allowlist change before relying on that action in a later
-commit, because GitHub evaluates the allowlist before any job in the dependent
-workflow can start.
-
-Repository secrets are unavailable to pull requests from forks. Their summary
-job fails explicitly until a maintainer retests the commit from a branch in the
-base repository; never use `pull_request_target` to execute pull-request code.
+`docker/login-action` and `julia-actions/setup-julia`. Every workflow reference
+is still pinned to a full commit SHA. Apply an allowlist change before relying
+on a newly permitted external action.
 
 ## Publishing
 
-Stable releases preserve the paclet name produced by `Scripts/BuildPaclet.wls`,
-for example `JuliaForm-1.2.3.paclet`. The rolling `dev` publisher copies that
-same built archive to a commit-unique release-asset name such as
-`JuliaForm-1.2.3-dev.0123456789ab.paclet`. This is a publication-layer rename:
-the builder and the downloaded workflow artifact retain the canonical paclet
-filename. Before moving the `dev` tag, the publisher downloads the renamed
-asset and verifies that its SHA-256 matches the built archive.
+The Julia `1` matrix job builds and validates one canonical archive such as
+`JuliaForm-1.2.3.paclet`, then uploads it as a short-lived workflow artifact.
+Only the two publisher jobs receive `contents: write` permission.
 
-If a stable release is already published, a rerun is read-only. It succeeds
-only when the release tag and title are canonical, the release is not a
-prerelease, exactly one canonical asset exists, and that asset's SHA-256
-matches the local archive. This covers a lost final API response without ever
-rewriting a published release.
+For a push to `main`, the `dev` publisher replaces the disposable rolling
+prerelease and its tag with a release for the tested commit. If that operation
+is interrupted, the next successful `main` run recreates it. The canonical
+archive filename is preserved.
 
-## Local validation
-
-For a local rerun on Linux amd64:
-
-```bash
-bash .github/scripts/check-repository-config.sh
-```
-
-On another platform, point `ACTIONLINT_BIN` at an executable actionlint 1.7.12
-binary; the version is still checked before validation begins.
+For a strict `vMAJOR.MINOR.PATCH` tag, the stable publisher verifies that the
+tag already exists and that the archive filename matches the tag before
+creating the GitHub Release. A published stable release is never rewritten.
+If publication is interrupted and leaves an incomplete draft, delete only
+that draft and rerun the tag workflow; never move, delete, or reuse a published
+version tag.
