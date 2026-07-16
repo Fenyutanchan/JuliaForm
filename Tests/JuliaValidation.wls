@@ -276,6 +276,9 @@ evaluationExpressions = {
             Power[jfReciprocalProbe[4, 2.], -1],
             Power[jfReciprocalProbe[5, 4.], -1]
         ]
+    ],
+    HoldForm[
+        Plus[1, Times[Rational[3, 2], Power[2, -1]]]
     ]
 };
 

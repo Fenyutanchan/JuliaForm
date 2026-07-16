@@ -21,6 +21,7 @@ $precedenceComparison = 60;
 $precedenceRange = 65;
 $precedenceAdditive = 70;
 $precedenceMultiplicative = 80;
+$precedenceExactRational = $precedenceMultiplicative - 1;
 $precedenceUnary = 85;
 $precedencePower = 90;
 $precedenceCall = 100;
@@ -264,7 +265,7 @@ emitHeld[HoldComplete[r_Rational]] := Module[{numerator, denominator},
     denominator = Denominator[r];
     {
         integerCode[numerator] <> " // " <> integerCode[denominator],
-        $precedenceMultiplicative
+        $precedenceExactRational
     }
 ];
 

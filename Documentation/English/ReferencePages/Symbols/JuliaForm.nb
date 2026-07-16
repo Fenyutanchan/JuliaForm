@@ -125,7 +125,9 @@ Cell[TextData[{
 Cell[TextData[{
     "Integers, rationals, complex numbers, and arbitrary-precision real numbers ",
     "retain exactness or explicit precision where Julia provides a faithful ",
-    "representation. Strings escape Julia interpolation and control characters."
+    "representation. Exact rational literals use Julia // syntax and are ",
+    "parenthesized inside larger multiplicative chains for clarity. Strings ",
+    "escape Julia interpolation and control characters."
 }], "Notes", CellID -> 1000020],
 
 Cell[TextData[{

@@ -202,6 +202,12 @@ quotation marks, control characters, and the Julia interpolation character
 | `If[c, t, f]` | `c ? t : f` |
 | `Piecewise[...]` | Nested Julia ternary expressions |
 
+An exact rational stays compact at the top level (`1 // 3`) but is
+parenthesized inside a larger multiplicative chain. For example,
+`FullSimplify[1 + 3/(2 x)]` renders as `1 + (3 // 2) / x`. The parentheses
+make the exact rational coefficient visually explicit without changing it to
+inexact `/` arithmetic.
+
 `SameQ` and `UnsameQ` are not rewritten as plain `==` and `!=` because strict
 Wolfram identity includes type differences. Their runtime comparator recurses
 through arrays, pairs, and tuples, treats same-typed floating and complex

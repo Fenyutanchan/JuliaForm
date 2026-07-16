@@ -34,7 +34,7 @@ end
 syntax_sources, value_sources, error_sources = generated_sources(validation_output())
 
 const EXPECTED_SYNTAX_SOURCE_COUNT = 31
-const EXPECTED_VALUE_SOURCE_COUNT = 122
+const EXPECTED_VALUE_SOURCE_COUNT = 123
 const EXPECTED_ERROR_SOURCE_COUNT = 47
 
 length(syntax_sources) == EXPECTED_SYNTAX_SOURCE_COUNT || error(
@@ -48,6 +48,10 @@ length(value_sources) == EXPECTED_VALUE_SOURCE_COUNT || error(
 length(error_sources) == EXPECTED_ERROR_SOURCE_COUNT || error(
     "error source count changed: expected $(EXPECTED_ERROR_SOURCE_COUNT), " *
     "got $(length(error_sources)); update assertions and the count together",
+)
+
+value_sources[123] == "1 + (3 // 2) / 2" || error(
+    "exact rational in a division chain was not grouped for readability",
 )
 
 function parses_completely(source)
@@ -297,6 +301,7 @@ values = [Core.eval(Main, Meta.parse(source)) for source in value_sources]
 @assert values[120] == true
 @assert values[121] == true
 @assert values[122] == 0.125
+@assert values[123] == (7 // 4)
 @assert jfProbeCounts == ones(Int, 9)
 @assert jfUnaryProbeCounts == ones(Int, 9)
 @assert jfEagerComparisonCounts == ones(Int, 18)

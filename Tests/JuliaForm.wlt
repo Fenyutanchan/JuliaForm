@@ -268,6 +268,24 @@ VerificationTest[
 ]
 
 VerificationTest[
+    ToString[
+        JuliaForm[FullSimplify[1 + 3/(2 x)]],
+        OutputForm
+    ],
+    "1 + (3 // 2) / x",
+    TestID -> "rational-coefficient-division-readability"
+]
+
+VerificationTest[
+    ToString[
+        JuliaForm[HoldForm[Times[Rational[3, 2], x]]],
+        OutputForm
+    ],
+    "(3 // 2) * x",
+    TestID -> "rational-factor-multiplication-readability"
+]
+
+VerificationTest[
     ToString[JuliaForm[1.], OutputForm],
     "1.0",
     TestID -> "machine-real"

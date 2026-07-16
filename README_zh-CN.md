@@ -186,6 +186,10 @@ ToString[JuliaForm[HoldForm[a - (b + c)]], OutputForm]
 | `If[c, t, f]` | `c ? t : f` |
 | `Piecewise[...]` | 嵌套的 Julia 三元表达式 |
 
+顶层精确有理数保持紧凑形式（`1 // 3`），但在更大的乘除链中会加括号。例如，
+`FullSimplify[1 + 3/(2 x)]` 会渲染为 `1 + (3 // 2) / x`。这些括号让精确
+有理数系数在视觉上更加明确，同时不会把它改成非精确的 `/` 算术。
+
 `SameQ` 和 `UnsameQ` 不是简单改写为 `==`/`!=`，因为 Wolfram 的严格同一性
 包含类型差异。其运行时比较器会递归处理数组、pair 和 tuple，按 Wolfram 语义
 处理同类型浮点数与复数的 signed zero；Julia dictionary 无法恢复 Association
