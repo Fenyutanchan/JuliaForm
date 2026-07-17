@@ -45,21 +45,65 @@ buildPacletDirectory = FileNameJoin[{
     outputDirectory,
     PacletTools`Utils`MakePacletDirectoryName[paclet]
 }];
-documentationResult =
-    JuliaFormBuildSupport`BuildDocumentationForAllLanguages[
-        pacletDirectory,
-        buildPacletDirectory,
-        paclet
-    ];
-If[!MatchQ[documentationResult, _Success],
-    Print["Documentation build failed: ", documentationResult];
-    Exit[1]
+
+(* PacletTools 14.0.1.0 filters Documentation extension files by Language but
+   does not pass that option to its Documentation build handler. Replace only
+   that handler so PacletBuild performs one complete bilingual build before it
+   writes the manifest and archive. *)
+documentationBuildHandler = With[{buildPaclet = paclet},
+    Function[{extension, sourceRoot, buildRoot, relativeFiles},
+        UsingFrontEnd[
+            JuliaFormBuildSupport`BuildDocumentationForAllLanguages[
+                sourceRoot,
+                buildRoot,
+                buildPaclet
+            ]
+        ]
+    ]
+];
+defaultExtensionHandlers = PacletTools`$DefaultPacletExtensionHandlers;
+documentationExtensionHandlers = Lookup[
+    defaultExtensionHandlers,
+    "Documentation",
+    <||>
+];
+extensionHandlers = Join[
+    defaultExtensionHandlers,
+    <|
+        "Documentation" -> Join[
+            documentationExtensionHandlers,
+            <|"Build" -> documentationBuildHandler|>
+        ]
+    |>
 ];
 
 Print["Building paclet from ", pacletDirectory, " into ", outputDirectory];
-result = PacletTools`PacletBuild[pacletDirectory, outputDirectory];
+result = PacletTools`PacletBuild[
+    pacletDirectory,
+    outputDirectory,
+    PacletTools`PacletExtensionHandlers -> extensionHandlers
+];
 If[!MatchQ[result, _Success],
     Print["PacletBuild failed: ", result];
+    Exit[1]
+];
+documentationBuildResults = result["DocumentationBuildResults"];
+If[
+    !MatchQ[
+        documentationBuildResults,
+        {
+            Success[
+                "DocumentationBuild",
+                data_?AssociationQ /;
+                    Lookup[data, "Languages", {}] ===
+                        JuliaFormBuildSupport`$RequiredDocumentationLanguages
+            ]
+        }
+    ],
+    Print[
+        "PacletBuild did not run exactly one complete bilingual documentation build: ",
+        documentationBuildResults
+    ];
     Exit[1]
 ];
 
